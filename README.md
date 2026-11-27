@@ -129,7 +129,7 @@ For writing your own workflows instead of using the example's. Pin each to a com
 | [`actions/dns`](actions/dns/action.yml) | Creates, updates or deletes a Cloudflare `A` record. |
 
 ```yaml
-- uses: pungoyal/caddy-edge/actions/deploy@<commit> # v0.1.0
+- uses: pungoyal/caddy-edge/actions/deploy@<commit> # v0.2.0
   with:
     sites: sites
     ssh-host: ${{ vars.SSH_HOST }}

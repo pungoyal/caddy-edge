@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - id: site
-        uses: pungoyal/caddy-edge/actions/site@2170fa82d474479b840874b7a1fbbdbba2ef7fa8 # v0.1.0
+        uses: pungoyal/caddy-edge/actions/site@30bbc47591c9ca249f2fbc7f99a90a9ee6233cc4 # v0.2.0
         with:
           sites: sites
           action: ${{ inputs.action }}
@@ -70,7 +70,7 @@ jobs:
           max-body: ${{ inputs.max_body }}
 
       # Before the commit, so a config Caddy rejects never reaches main.
-      - uses: pungoyal/caddy-edge/actions/validate@2170fa82d474479b840874b7a1fbbdbba2ef7fa8 # v0.1.0
+      - uses: pungoyal/caddy-edge/actions/validate@30bbc47591c9ca249f2fbc7f99a90a9ee6233cc4 # v0.2.0
         with:
           sites: sites
 
@@ -103,7 +103,7 @@ jobs:
     # For SSH_HOST: the record points at the server the deploy goes to.
     environment: production
     steps:
-      - uses: pungoyal/caddy-edge/actions/dns@2170fa82d474479b840874b7a1fbbdbba2ef7fa8 # v0.1.0
+      - uses: pungoyal/caddy-edge/actions/dns@30bbc47591c9ca249f2fbc7f99a90a9ee6233cc4 # v0.2.0
         with:
           action: ${{ inputs.action == 'set' && 'set' || 'delete' }}
           hostname: ${{ needs.write.outputs.hostname }}
