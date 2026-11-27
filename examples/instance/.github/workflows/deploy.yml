@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # The site workflow deploys the commit it just pushed, which is not the one it started on.
+  # Called by the site workflow, to deploy the commit it has just pushed.
   workflow_call:
     inputs:
       ref:

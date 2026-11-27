@@ -1,9 +1,9 @@
 name: Validate caddy-edge sites
-description: Checks site files against the edge's Caddyfile and starts Caddy once with internal certificates.
+description: Checks site files against caddy-edge's Caddyfile and starts Caddy once with self-signed certificates.
 
 inputs:
   sites:
-    description: Directory of *.caddy site files in the workspace. Empty validates the edge alone.
+    description: Directory of *.caddy site files in the workspace. Empty checks caddy-edge's own configuration with no sites.
     required: false
     default: ""
 

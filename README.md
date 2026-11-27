@@ -3,36 +3,7 @@
 [![ci](https://github.com/pungoyal/caddy-edge/actions/workflows/ci.yml/badge.svg)](https://github.com/pungoyal/caddy-edge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A hardened [Caddy](https://caddyserver.com) reverse proxy for one Docker host, kept in git and deployed by GitHub Actions. Every application gets HTTPS, security headers and a credential-free access log from a four-line file, and adding one is a form.
-
-**[pungoyal.github.io/caddy-edge](https://pungoyal.github.io/caddy-edge/)** is the overview; this file is the reference.
-
-```
-                 your private instance repo                      your Docker host
-        ┌──────────────────────────────────────┐          ┌───────────────────────────┐
-        │ sites/app.caddy                      │          │  Caddy  :80 :443          │
-form ──▶│ .github/workflows/site.yml           │── SSH ──▶│    │ shared Docker network│
-        │ .github/workflows/deploy.yml         │          │    ├── app:3000           │
-        └───────────────┬──────────────────────┘          │    └── other:8080         │
-                        │ uses: pungoyal/caddy-edge/actions/…@<sha>                   │
-                        ▼                                 └───────────────────────────┘
-                   this repository
-```
-
-This repository is the engine and holds no hostnames, addresses or secrets. Yours live in a private repository that calls the actions here, so what you serve and your deploy logs stay private while the engine stays shared.
-
-## What you get
-
-- **HTTPS without thought.** Caddy obtains and renews a certificate for every site.
-- **One hardening policy for every site.** HSTS, `nosniff`, fingerprint headers removed, spoofable client headers (`X-Real-IP`, `X-Original-URL`, …) stripped, a request-body cap, timeouts against slow clients, and compression.
-- **One owner for document policy.** A site imports `hardened` (the edge writes CSP `frame-ancestors`, Referrer-Policy, Permissions-Policy, COOP) or `hardened-app-policy` (the app ships its own). Never both, so an origin never sends two policies.
-- **Logs without credentials.** Authorization, cookies, token headers and token query parameters are removed from the access log and from Caddy's own error log.
-- **Unknown hostnames get nothing.** A request for a name with no site file is aborted, not answered.
-- **Deploys that do not drop connections.** A config change is applied by `caddy reload`. A config Caddy rejects leaves the old one serving, and a deploy that does not come up healthy puts the previous files back.
-- **A locked-down container.** Read-only filesystem, every capability dropped except binding ports, `no-new-privileges`, memory and CPU limits, admin API on loopback only.
-- **A form for adding a site.** A workflow writes the site file from validated inputs, commits it, optionally creates the DNS record, and deploys.
-
-## A site
+HTTPS and security headers for every app on your Docker server. Describe an app in four lines and push; it goes live on its own hostname with a certificate. A mistake in the config never takes your sites down.
 
 ```caddy
 app.example.com {
@@ -41,30 +12,122 @@ app.example.com {
 }
 ```
 
-`app:3000` is a container name and port on the shared Docker network; applications publish no host ports. The snippets are documented in [`deploy/caddy/sites/README.md`](deploy/caddy/sites/README.md) and reasoned in the [`Caddyfile`](deploy/caddy/Caddyfile).
+Built on [Caddy](https://caddyserver.com) and GitHub Actions. Nothing to install on the server but Docker. Overview: **[pungoyal.github.io/caddy-edge](https://pungoyal.github.io/caddy-edge/)**.
 
-## Getting started
+## How it works
 
-You need a host with a public IPv4 address and a domain whose DNS you control. [`examples/instance`](examples/instance) is a complete instance repository, and its [README](examples/instance/README.md) is the step-by-step guide. In short:
+1. Your apps run in Docker on one server and join a shared Docker network. None of them opens a port to the internet.
+2. You keep one four-line file per app in a private GitHub repository of your own.
+3. On every push, GitHub Actions checks the config and sends it to the server over SSH, where Caddy serves every app over HTTPS.
 
-1. Prepare the host: Docker Engine 25 or later with the Compose plugin, a deploy user in the `docker` group, a directory for the edge, a Docker network, and ports 80 and 443 (TCP) and 443 (UDP) open.
-2. Create a **private** repository from the contents of `examples/instance`.
-3. Give it the host's address, a deploy key and an ACME contact address as variables and a secret.
-4. Run the `site` workflow to add your first application.
+Your repository holds only your site files and two workflows. The workflows call the actions in this repository, which bring the Caddy configuration, the Compose file and the deploy logic.
+
+## Quick start
+
+You need a Linux server with Docker Engine 25 or later and a public IPv4 address, a domain, and a GitHub account. The commands use the [GitHub CLI](https://cli.github.com).
+
+**1. Prepare the server.** Create the network your apps will share and a directory for caddy-edge. Open TCP 80 and 443 and UDP 443.
+
+```sh
+docker network create edge
+sudo install -d -o "$USER" /opt/edge
+```
+
+**2. Put an app on the network.** In the app's own Compose file. It needs no `ports:` entry: Caddy reaches it by service name.
+
+```yaml
+services:
+  app:
+    image: ghcr.io/you/app
+    networks: [edge]
+
+networks:
+  edge:
+    external: true
+```
+
+**3. Create your repository**, on your own computer, from [`examples/instance`](examples/instance). Keep it private: it names your hostnames and your server.
+
+```sh
+gh repo create my-edge --private --clone && cd my-edge
+curl -sL https://github.com/pungoyal/caddy-edge/archive/refs/heads/main.tar.gz |
+  tar -xz --strip-components=3 caddy-edge-main/examples/instance
+```
+
+**4. Tell it where your server is.** Replace the address, user and email with yours.
+
+```sh
+gh api -X PUT "repos/{owner}/{repo}/environments/production"
+gh variable set SSH_HOST --env production --body 203.0.113.10
+gh variable set SSH_USER --env production --body deploy
+gh variable set SSH_KNOWN_HOSTS --env production \
+  --body "$(ssh-keyscan -t ed25519 203.0.113.10 2>/dev/null)"
+gh variable set DEPLOY_PATH --env production --body /opt/edge
+gh variable set DOCKER_NETWORK --env production --body edge
+gh variable set ACME_EMAIL --env production --body you@example.com
+
+ssh-keygen -t ed25519 -f deploy_key -C github-actions -N ""
+gh secret set SSH_PRIVATE_KEY --env production < deploy_key
+ssh-copy-id -f -i deploy_key.pub deploy@203.0.113.10
+rm deploy_key deploy_key.pub
+```
+
+**5. Go live.** Point a DNS `A` record for your hostname at the server, put the hostname and your app's `service:port` in `sites/app.caddy`, and push.
+
+```sh
+git add -A && git commit -m "Serve my first app"
+git push -u origin main
+gh run watch
+```
+
+The README that lands in your repository ([`examples/instance/README.md`](examples/instance/README.md)) covers each step in more detail, and day-to-day use.
+
+## What every app gets
+
+- **Automatic HTTPS.** A certificate for every hostname, obtained and renewed by Caddy.
+- **Security headers.** HSTS, `nosniff`, a `frame-ancestors` policy, a referrer policy, browser features such as camera and microphone switched off, and `Server` and `X-Powered-By` removed.
+- **Nothing spoofed.** Headers a visitor could forge to fake their address or reach a hidden route (`X-Real-IP`, `X-Original-URL`, …) are removed before your app sees the request.
+- **Logs without secrets.** `Authorization`, cookies, token headers and token query parameters never reach the access log.
+- **No stray answers.** A request for a hostname you did not configure is dropped.
+- **No 502 during restarts.** While an app's container is being replaced, requests wait up to 30 seconds for it.
+- **Limits.** A request-body cap you choose per app, and timeouts against slow clients.
+- **A locked-down proxy.** Caddy runs with a read-only filesystem, every capability dropped except binding ports, and no access to the Docker socket.
+
+[`deploy/caddy/sites/README.md`](deploy/caddy/sites/README.md) is the reference for writing a site file. The rules themselves are in one commented [`Caddyfile`](deploy/caddy/Caddyfile).
+
+## Adding and removing apps
+
+Edit the files in `sites/` and push, or run the `site` workflow from your repository's Actions tab, the GitHub mobile app or a terminal:
+
+```sh
+gh workflow run site.yml -f action=set -f name=blog -f hostname=blog.example.com -f upstream=blog:8080
+gh workflow run site.yml -f action=remove -f name=blog
+```
+
+The workflow writes the file from the inputs, checks it, commits it and deploys. With `-f dns=true` and a Cloudflare token it also creates or deletes the DNS record.
+
+## What a deploy does
+
+1. **Checks.** Caddy validates your site files, then is started once with self-signed certificates. This runs on pull requests too and needs no secrets.
+2. **Ships.** `compose.yaml`, `.env` and `caddy/` are copied to the server. What was serving is kept in `previous/`.
+3. **Reloads.** `caddy reload` applies the config with no dropped connection. The container is recreated only when the Compose file itself changed, such as for a new Caddy version.
+4. **Recovers.** If Caddy rejects the config or does not come up healthy, `previous/` is put back and the run fails.
+
+Those three files and one container are all that is on the server, so `docker compose ps`, `logs` and `restart` work by hand in the deploy directory. CI runs this sequence, failure included, against a real SSH target on every change to this repository.
 
 ## Actions
 
-Pin each to a commit SHA; Renovate's `config:best-practices` keeps the pin current. Inputs are listed in each `action.yml`.
+For writing your own workflows instead of using the example's. Pin each to a commit; [Renovate](https://docs.renovatebot.com) keeps the pin current. Every input is described in the action's `action.yml`.
 
 | Action | What it does |
 | --- | --- |
-| [`actions/validate`](actions/validate/action.yml) | Checks the site files against the edge's Caddyfile, then starts Caddy once with internal certificates. Needs no secrets, so it is safe on pull requests. |
-| [`actions/deploy`](actions/deploy/action.yml) | Ships `compose.yaml`, `.env` and `caddy/` to the host over SSH, runs `docker compose up -d --wait` and `caddy reload`, and restores the previous files if that fails. |
+| [`actions/validate`](actions/validate/action.yml) | Checks site files and starts Caddy once with self-signed certificates. Needs no secrets. |
+| [`actions/deploy`](actions/deploy/action.yml) | Ships the config to the server, reloads Caddy, and restores the previous config if that fails. |
 | [`actions/site`](actions/site/action.yml) | Writes or removes one site file. Every input is matched against a pattern before it becomes config. |
-| [`actions/dns`](actions/dns/action.yml) | Creates, updates or deletes a DNS-only Cloudflare `A` record. Optional: any DNS provider works if you create the record yourself. |
+| [`actions/dns`](actions/dns/action.yml) | Creates, updates or deletes a Cloudflare `A` record. |
 
 ```yaml
-- uses: pungoyal/caddy-edge/actions/deploy@<sha> # v0.1.0
+- uses: pungoyal/caddy-edge/actions/deploy@<commit> # v0.1.0
   with:
     sites: sites
     ssh-host: ${{ vars.SSH_HOST }}
@@ -76,31 +139,22 @@ Pin each to a commit SHA; Renovate's `config:best-practices` keeps the pin curre
     acme-email: ${{ vars.ACME_EMAIL }}
 ```
 
-## How a deploy works
+## Limits
 
-1. The action assembles `compose.yaml`, `.env` and `caddy/` from this repository at the pinned commit, plus your site files.
-2. On the host it copies what is serving to `previous/`, unpacks the new files to `next/`, and refills `caddy/` in place. The directory is never replaced: the container mounts it and would keep reading the old one.
-3. `docker compose up -d --wait` recreates Caddy only if `compose.yaml` changed (an image update; sites drop for a few seconds). Otherwise `caddy reload` applies the config with no dropped connection.
-4. If either fails, the action prints Caddy's log without the access log, puts `previous/` back, brings it up, and fails the job.
+- **One server.** One Caddy on one host; no clustering.
+- **No WAF.** No rate limiting and no bot rules.
+- **No CDN proxy in front.** Certificates are obtained by the server answering directly, so its address is public. Cloudflare records must be DNS-only.
+- **It does not deploy your apps.** They are their own Compose projects.
 
-Nothing but those files is on the host, so `docker compose ps`, `logs` and `restart` work by hand in the deploy directory. CI runs this whole sequence against the runner itself on every change, including the failure path.
-
-## What it is not
-
-- **Not a platform.** It does not build or deploy your applications; they are their own Compose projects that join the shared network.
-- **Not a firewall.** No rate limiting, no WAF, no bot rules.
-- **Not behind a CDN.** Certificates come from HTTP and TLS-ALPN challenges, so the host answers directly and its address is public. With Cloudflare, records must be DNS-only.
-- **Not multi-host.** One Caddy on one host.
-
-If you would rather have applications declare their own routes with container labels and no repository in between, look at [caddy-docker-proxy](https://github.com/lucaslorentz/caddy-docker-proxy) or [Traefik](https://traefik.io/traefik/). The price is giving the proxy the Docker socket.
+To have apps appear by container label, with no repository in between, use [caddy-docker-proxy](https://github.com/lucaslorentz/caddy-docker-proxy) or [Traefik](https://traefik.io/traefik/). The price is giving the proxy the Docker socket.
 
 ## Security
 
-The trust model and how to report a vulnerability are in [`SECURITY.md`](SECURITY.md). The short version: whoever can run your instance's workflows controls your host, so keep that repository private and its write access small.
+The deploy user can run Docker, which is root on the server, so whoever can push to your repository controls the server. Keep it private and its collaborators few. [`SECURITY.md`](SECURITY.md) has the rest, and how to report a vulnerability.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). Changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Releases are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Licence
 

@@ -18,7 +18,7 @@ inputs:
     description: "set: container:port on the shared Docker network."
     required: false
   policy:
-    description: "set: hardened if the edge writes the document policy, hardened-app-policy if the app ships its own."
+    description: "set: hardened for most apps; hardened-app-policy if the app sends its own Content-Security-Policy."
     required: false
     default: hardened
   frame-ancestors:

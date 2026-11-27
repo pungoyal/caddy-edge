@@ -1,5 +1,5 @@
 name: Bug report
-description: Something the edge or one of its actions does wrong
+description: Something caddy-edge or one of its actions does wrong
 labels: [bug]
 body:
   - type: markdown

@@ -50,15 +50,16 @@
 	}
 }
 
-# The edge owns the connection (hardened-app-policy, every site); exactly one party
-# owns the document policy per site, chosen statically by which snippet is imported:
+# Every site imports one of two snippets:
 #
-#   import hardened <max_request_body> <frame_ancestors>   edge owns it
-#   import hardened-app-policy <max_request_body>          app owns it
+#   import hardened <max_request_body> <frame_ancestors>   for most apps
+#   import hardened-app-policy <max_request_body>          for an app that sends its own CSP
 #
-# Static, never inferred from the response: a `?Header` default fires only on
-# routes where the app stayed silent (Grafana, for one, sets X-Frame-Options from
-# its API handlers but not its static handler), giving one origin two policies.
+# Both harden the connection. `hardened` also writes the document policy (CSP,
+# Referrer-Policy, Permissions-Policy, COOP); `hardened-app-policy` leaves it to the app.
+# The site file chooses. Do not replace the choice with `?Header` defaults that apply
+# when the app sends nothing: apps send these headers on some routes and not others,
+# and the origin would end up with two different policies.
 
 # For apps that ship their own policy, and the base of `hardened`. Fields are
 # omitted, not deleted: a `-Content-Security-Policy` op runs after the proxy and
@@ -114,7 +115,7 @@
 	import hardened-app-policy {args[0]}
 
 	header {
-		# Not a content policy: the edge cannot know an app's script origins.
+		# Not a content policy: the origins an app loads scripts from are not known here.
 		# `base-uri 'self'`, not 'none': apps such as Grafana serve <base href="/">.
 		Content-Security-Policy "frame-ancestors {args[1]}; object-src 'none'; base-uri 'self'"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -140,7 +141,8 @@
 
 import sites/*.caddy
 
-# Without these Caddy answers 200 for any Host header.
+# Requests for a hostname with no site file are dropped. Without these, Caddy
+# answers them with an empty 200.
 :80 {
 	abort
 }

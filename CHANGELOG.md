@@ -10,7 +10,7 @@ First public release.
 
 - `deploy/`: Caddy on Docker Compose, read-only and with every capability dropped except binding ports, and a Caddyfile with the `hardened`, `hardened-app-policy` and `app` snippets, credential-redacted logs and a catch-all that aborts unmatched hostnames.
 - `actions/validate`: checks site files and starts Caddy once with internal certificates.
-- `actions/deploy`: ships the edge and the site files over SSH, applies a config change by reload, and restores the previous config when the new one does not come up.
+- `actions/deploy`: ships Caddy's configuration and your site files to the server over SSH, applies a config change by reload, and restores the previous config when the new one does not come up.
 - `actions/site`: writes or removes a site file from validated inputs.
 - `actions/dns`: creates, updates or deletes a DNS-only Cloudflare `A` record.
 - `examples/instance`: the workflows and layout of a private instance repository.

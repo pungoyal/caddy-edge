@@ -1,5 +1,5 @@
 name: Deploy caddy-edge
-description: Ships the edge and the caller's site files to a Docker host over SSH and reloads Caddy, restoring the previous config if that fails.
+description: Ships Caddy's configuration and your site files to a Docker host over SSH and reloads Caddy, restoring the previous config if that fails.
 
 inputs:
   sites:
@@ -22,7 +22,7 @@ inputs:
     description: The host's known_hosts line(s), e.g. from ssh-keyscan -t ed25519.
     required: true
   deploy-path:
-    description: Absolute directory on the host the edge lives in. It must exist and be writable by the SSH user.
+    description: Absolute directory on the host to deploy into. It must exist and be writable by the SSH user.
     required: true
   docker-network:
     description: Existing Docker network that Caddy and every application join.

@@ -1,6 +1,7 @@
-# Rules for agents
+# Rules for contributors and agents
 
-- This repository is the engine: it holds no hostnames, addresses or secrets. Site files, variables and deploy logs belong to an instance repository (`examples/instance`).
+- This repository holds no real hostnames, addresses or secrets. Those belong to each user's own repository, which `examples/instance` is the template for.
+- Write for someone who has never seen the project. Docs, comments, error messages and commit messages say what a thing does and why it is right, in the reader's terms. They do not narrate how it came to be.
 - What reaches the host is `compose.yaml`, `.env` and `caddy/`, and one command. No script is shipped to the host; the rollback's branching stays in `actions/deploy/action.yml`.
 - `compose.yaml` mounts the `caddy/` directory, and the deploy empties and refills it. Do not mount single files or replace the directory: the running container would keep reading the old one.
 - A config change must reach Caddy by `caddy reload`. Do not make a deploy recreate the container unless `compose.yaml` changed.

@@ -4,7 +4,7 @@ Issues and pull requests are welcome. For anything larger than a fix, open an is
 
 ## Ground rules
 
-The rules this project holds itself to are in [`AGENTS.md`](AGENTS.md); they apply to people as much as to agents. The ones most often missed:
+The project's rules are in [`AGENTS.md`](AGENTS.md). The ones most often missed:
 
 - No hostnames, addresses or secrets in this repository. Use `example.com`.
 - A behaviour of the `deploy` action needs an assertion in the `deploy` job of `.github/workflows/ci.yml`, which deploys to the runner itself.

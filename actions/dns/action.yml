@@ -1,5 +1,5 @@
 name: Set a caddy-edge DNS record
-description: Creates, updates or deletes a DNS-only Cloudflare A record for a hostname the edge serves.
+description: Creates, updates or deletes a DNS-only Cloudflare A record that points a hostname at your server.
 
 inputs:
   action:

@@ -1,34 +1,34 @@
 name: site
 run-name: ${{ inputs.action }} ${{ inputs.name }}
 
-# The admin interface: whoever may run this workflow may change what the edge serves.
+# A form for adding, changing and removing apps. Everyone with write access can run it.
 on:
   workflow_dispatch:
     inputs:
       action:
-        description: set adds a site or updates one; remove stops serving it
+        description: set adds an app or updates it; remove stops serving it
         type: choice
         options: [set, remove]
         required: true
       name:
-        description: Site name, the file in sites/ (e.g. app)
+        description: A short name for the app; it becomes sites/<name>.caddy (e.g. blog)
         required: true
       hostname:
-        description: "set: hostname to serve (e.g. app.example.com)"
+        description: "set: hostname to serve (e.g. blog.example.com)"
       upstream:
-        description: "set: container:port on the shared Docker network (e.g. app:3000)"
+        description: "set: the app's service name and port on the shared Docker network (e.g. blog:8080)"
       policy:
-        description: "set: hardened if the edge writes the CSP, hardened-app-policy if the app ships its own"
+        description: "set: hardened for most apps; hardened-app-policy if the app sends its own Content-Security-Policy"
         type: choice
         options: [hardened, hardened-app-policy]
         default: hardened
       frame_ancestors:
-        description: "set, hardened only: who may embed the site"
+        description: "set, hardened only: who may show the app in a frame"
         type: choice
         options: ["'self'", "'none'"]
         default: "'self'"
       max_body:
-        description: "set: largest request body"
+        description: "set: largest request body to accept"
         default: 10MB
       dns:
         description: Also create (set) or delete (remove) the Cloudflare A record
@@ -100,7 +100,7 @@ jobs:
     needs: write
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    # For SSH_HOST: the record points at the host the deploy goes to.
+    # For SSH_HOST: the record points at the server the deploy goes to.
     environment: production
     steps:
       - uses: pungoyal/caddy-edge/actions/dns@2170fa82d474479b840874b7a1fbbdbba2ef7fa8 # v0.1.0

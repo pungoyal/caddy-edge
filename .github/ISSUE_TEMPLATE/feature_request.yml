@@ -1,5 +1,5 @@
 name: Feature request
-description: Something the edge should do, or should stop doing
+description: Something caddy-edge should do, or should stop doing
 labels: [enhancement]
 body:
   - type: textarea

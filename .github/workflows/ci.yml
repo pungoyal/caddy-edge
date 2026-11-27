@@ -26,9 +26,9 @@ jobs:
         uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
         with:
           args: -color
-      # site.yml calls ./.github/workflows/deploy.yml, which is beside it in an instance
+      # site.yml calls ./.github/workflows/deploy.yml, which is beside it in a user's
       # repository and not at this repository's root, where actionlint looks.
-      - name: actionlint (the example instance)
+      - name: actionlint (the example repository)
         uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
         with:
           args: -color -ignore "could not read reusable workflow file" examples/instance/.github/workflows/deploy.yml examples/instance/.github/workflows/site.yml
