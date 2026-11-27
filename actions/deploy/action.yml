@@ -120,6 +120,8 @@ runs:
           # Every command here only reads. The comparison happens on the runner, so
           # nothing is written to the host, not even a temporary file.
           [[ $DOCKER_NETWORK =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || { echo "::error::invalid docker-network" >&2; exit 1; }
+          # Asked first and on its own, so a wrong key or host key is not reported as a missing directory.
+          ssh -F "$RUNNER_TEMP/edge-ssh/config" edge true || { echo "::error::cannot log in over SSH: check ssh-host, ssh-user, ssh-private-key and ssh-known-hosts" >&2; exit 1; }
           on_host 'test -w .' || { echo "::error::deploy-path is missing or not writable by the SSH user" >&2; exit 1; }
           on_host 'docker compose version' || { echo "::error::the SSH user cannot run docker compose" >&2; exit 1; }
           on_host "docker network inspect $DOCKER_NETWORK >/dev/null" || { echo "::error::the Docker network does not exist on the host" >&2; exit 1; }
