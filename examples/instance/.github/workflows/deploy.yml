@@ -28,7 +28,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      - uses: pungoyal/caddy-edge/actions/validate@30bbc47591c9ca249f2fbc7f99a90a9ee6233cc4 # v0.2.0
+      - uses: pungoyal/caddy-edge/actions/validate@4d3d16f2d9641dc61b99a88b8783424b886f4895 # v0.2.1
         with:
           sites: sites
 
@@ -47,7 +47,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      - uses: pungoyal/caddy-edge/actions/deploy@30bbc47591c9ca249f2fbc7f99a90a9ee6233cc4 # v0.2.0
+      - uses: pungoyal/caddy-edge/actions/deploy@4d3d16f2d9641dc61b99a88b8783424b886f4895 # v0.2.1
         with:
           sites: sites
           ssh-host: ${{ vars.SSH_HOST }}
