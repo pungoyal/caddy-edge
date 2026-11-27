@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>caddy-edge: a hardened HTTPS edge for one Docker host</title>
-<meta name="description" content="A hardened Caddy reverse proxy for one Docker host, kept in git and deployed by GitHub Actions. Each application is a four-line file, and adding one is a form.">
+<title>caddy-edge: HTTPS and security headers for every app on your Docker server</title>
+<meta name="description" content="Put every app on your Docker server behind HTTPS and security headers. Describe an app in four lines, push, and it is live. Free, open source, built on Caddy and GitHub Actions.">
 <link rel="canonical" href="https://pungoyal.github.io/caddy-edge/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="caddy-edge">
-<meta property="og:description" content="A hardened HTTPS edge for one Docker host. Each application is a four-line file, and adding one is a form.">
+<meta property="og:description" content="HTTPS and security headers for every app on your Docker server. Four lines per app. Push to deploy.">
 <meta property="og:url" content="https://pungoyal.github.io/caddy-edge/">
 <meta property="og:image" content="https://pungoyal.github.io/caddy-edge/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -152,6 +152,35 @@ h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; text-wrap: ba
 
 footer { border-top: 1px solid var(--line); padding-block: 2rem 3rem; font-size: 0.875rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; justify-content: space-between; }
 footer p { max-width: 40rem; }
+
+/* Three-step explainer */
+.three { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); counter-reset: card; }
+.three > li { counter-increment: card; border: 1px solid var(--line); border-radius: 10px; padding: 1.1rem 1.2rem 1.25rem; background: var(--surface); }
+.three > li::before { content: counter(card); font: 600 0.8125rem var(--mono); color: var(--accent); }
+.three h3 { font-size: 1.0625rem; margin-top: 0.35rem; letter-spacing: -0.01em; }
+.three p { margin-top: 0.4rem; font-size: 0.9375rem; color: var(--muted); }
+
+/* Quick start */
+.guide { counter-reset: g; }
+.guide > li { counter-increment: g; padding-block: 1.5rem; border-top: 1px solid var(--line); }
+.guide > li:first-child { border-top: 0; padding-top: 0; }
+.guide h3 { font-size: 1.0625rem; letter-spacing: -0.01em; }
+.guide h3::before { content: counter(g) "  "; white-space: pre; font-family: var(--mono); color: var(--accent); }
+.guide p { margin-top: 0.5rem; color: var(--muted); font-size: 0.9375rem; max-width: 42rem; }
+.guide pre { margin-top: 0.85rem; }
+
+/* Fit */
+.fit { display: grid; gap: 1.5rem 2.5rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.fit h3 { font-size: 0.8125rem; font-family: var(--mono); font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
+.fit li { padding-block: 0.55rem; border-bottom: 1px solid var(--line); font-size: 0.9375rem; }
+.fit li:last-child { border-bottom: 0; }
+
+/* Questions */
+details { border-top: 1px solid var(--line); padding-block: 0.9rem; margin: 0 !important; }
+details:first-child { border-top: 0; padding-top: 0; }
+summary { font-weight: 600; cursor: pointer; }
+summary::marker { color: var(--accent); }
+details p { margin-top: 0.5rem; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -160,9 +189,9 @@ footer p { max-width: 40rem; }
 <header class="top">
   <a class="name" href="./" aria-label="caddy-edge home"><span>▸</span> caddy-edge</a>
   <nav aria-label="Primary">
-    <a class="opt" href="#every-site">Hardening</a>
-    <a class="opt" href="#deploy">Deploys</a>
-    <a href="#start">Get started</a>
+    <a class="opt" href="#how">How it works</a>
+    <a class="opt" href="#get">What you get</a>
+    <a href="#start">Quick start</a>
     <a href="https://github.com/pungoyal/caddy-edge">GitHub</a>
   </nav>
 </header>
@@ -171,12 +200,13 @@ footer p { max-width: 40rem; }
 
 <div class="hero">
   <div>
-    <h1>A hardened HTTPS edge for one Docker host.</h1>
-    <p class="lede">Caddy, kept in git and deployed by GitHub Actions. <strong>Each application is a four-line file, and adding one is a form.</strong> A config Caddy rejects never replaces the one that is serving.</p>
+    <h1>HTTPS for every app on your Docker server.</h1>
+    <p class="lede">Describe an app in four lines and push. It goes live on its own hostname with a certificate and security headers. <strong>A mistake in the config never takes your sites down.</strong></p>
     <div class="cta">
-      <a class="btn primary" href="#start">Get started</a>
+      <a class="btn primary" href="#start">Quick start</a>
       <a class="btn" href="https://github.com/pungoyal/caddy-edge">View on GitHub</a>
     </div>
+    <p class="caption">Free and open source. Built on <a href="https://caddyserver.com">Caddy</a> and GitHub Actions. Nothing to install on the server but Docker.</p>
   </div>
   <figure>
     <p class="file">sites/app.caddy</p>
@@ -184,189 +214,209 @@ footer p { max-width: 40rem; }
 	<span class="k">import</span> hardened 10MB <span class="s">'self'</span>
 	<span class="k">import</span> app app:3000
 }</code></pre>
-    <figcaption class="caption">The whole configuration for one application: a certificate, security headers, a body cap, compression, a credential-free access log, and a proxy that waits out a restart.</figcaption>
+    <figcaption class="caption">That is everything you write for one app: the hostname to serve, the largest upload to accept, who may embed it in a frame, and the container and port to send traffic to.</figcaption>
   </figure>
 </div>
 
 <section id="how">
   <div>
-    <h2>Two repositories</h2>
-    <p class="sub">What you serve stays private. The engine stays shared.</p>
+    <h2>How it works</h2>
+    <p class="sub">You need a Linux server with Docker and a public IP address, a domain, and a GitHub account.</p>
   </div>
   <div class="body">
-    <div class="flow">
-      <div class="node">
-        <p class="tag">You</p>
-        <h3>A form, or a pull request</h3>
-        <ul>
-          <li>name: app</li>
-          <li>hostname: app.example.com</li>
-          <li>upstream: app:3000</li>
-        </ul>
-      </div>
-      <div class="arrow">commit</div>
-      <div class="node">
-        <p class="tag">Private</p>
-        <h3>Your instance repository</h3>
-        <ul>
-          <li>sites/*.caddy</li>
-          <li>workflows: site, deploy</li>
-          <li>variables, deploy key</li>
-        </ul>
-      </div>
-      <div class="arrow">SSH</div>
-      <div class="node">
-        <p class="tag">Yours</p>
-        <h3>Your Docker host</h3>
-        <ul>
-          <li>Caddy :80 :443</li>
-          <li>shared Docker network</li>
-          <li>app:3000, other:8080</li>
-        </ul>
-      </div>
-    </div>
-    <p class="engine">The instance's workflows call <code>pungoyal/caddy-edge/actions/…@&lt;commit&gt;</code>. This repository holds the Caddyfile, the Compose file and the deploy logic, and no hostnames, addresses or secrets. Renovate moves the pin when there is a release.</p>
+    <ol class="three">
+      <li>
+        <h3>Your apps run in Docker</h3>
+        <p>Each one joins a shared Docker network. None of them opens a port to the internet.</p>
+      </li>
+      <li>
+        <h3>You list them in a repository</h3>
+        <p>One four-line file per app, in a private GitHub repository of your own. Edit a file, or fill in a form.</p>
+      </li>
+      <li>
+        <h3>A push puts them online</h3>
+        <p>GitHub Actions checks the config and sends it to your server, where Caddy serves every app over HTTPS.</p>
+      </li>
+    </ol>
   </div>
 </section>
 
-<section id="every-site">
+<section id="get">
   <div>
-    <h2>What every site gets</h2>
-    <p class="sub">One policy, imported by name. Read it in the <a href="https://github.com/pungoyal/caddy-edge/blob/main/deploy/caddy/Caddyfile">Caddyfile</a>, where every line says why.</p>
+    <h2>What you get</h2>
+    <p class="sub">The same protection for every app, without configuring it per app.</p>
   </div>
   <div class="body">
-    <div class="cols">
-      <div>
-        <h3>Sent to the browser</h3>
-        <ul>
-          <li>Strict-Transport-Security</li>
-          <li>X-Content-Type-Options</li>
-          <li>Content-Security-Policy *</li>
-          <li>Referrer-Policy *</li>
-          <li>Permissions-Policy *</li>
-          <li>Cross-Origin-Opener-Policy *</li>
-        </ul>
-      </div>
-      <div>
-        <h3>Removed from responses</h3>
-        <ul>
-          <li>Server</li>
-          <li>X-Powered-By</li>
-          <li>Via</li>
-          <li>X-XSS-Protection</li>
-        </ul>
-      </div>
-      <div>
-        <h3>Stripped from requests</h3>
-        <ul>
-          <li>X-Real-IP, X-Client-IP</li>
-          <li>CF-Connecting-IP, True-Client-IP</li>
-          <li>Forwarded, X-Forwarded-Port, -Prefix, -Server</li>
-          <li>X-Original-URL, X-Rewrite-URL</li>
-        </ul>
-      </div>
-      <div>
-        <h3>Kept out of logs</h3>
-        <ul>
-          <li>Authorization, Proxy-Authorization</li>
-          <li>Cookie, Set-Cookie</li>
-          <li>Grafana token headers</li>
-          <li>?token, ?access_token, ?api_key, …</li>
-        </ul>
-      </div>
-    </div>
-    <p>* The document policy has exactly one owner per site. <code>import hardened</code> and the edge writes it: <code>frame-ancestors</code>, <code>object-src 'none'</code>, <code>base-uri 'self'</code>. <code>import hardened-app-policy</code> and the application's own passes through untouched. Never both, so an origin never sends two policies that disagree.</p>
     <dl class="rows">
-      <div><dt>Certificates</dt><dd>Obtained and renewed by Caddy for every site file. Nothing to configure.</dd></div>
-      <div><dt>Unknown hostnames</dt><dd>A request for a name with no site file is aborted, not answered.</dd></div>
-      <div><dt>Slow clients</dt><dd>Header, body and idle timeouts, and a request-body cap you set per site.</dd></div>
-      <div><dt>Application restarts</dt><dd>The proxy retries failed connects for 30 seconds, so a request that arrives while a container is being replaced waits instead of getting a 502.</dd></div>
-      <div><dt>The container</dt><dd>Read-only filesystem, every capability dropped except binding ports, <code>no-new-privileges</code>, memory and CPU limits, admin API on loopback only. No Docker socket.</dd></div>
+      <div><dt>Automatic HTTPS</dt><dd>A certificate for every hostname, obtained and renewed for you. HTTP/3 included.</dd></div>
+      <div><dt>Security headers</dt><dd>HSTS, clickjacking protection, <code>nosniff</code>, a referrer policy, and browser features such as camera and microphone switched off unless your app asks.</dd></div>
+      <div><dt>Nothing spoofed</dt><dd>Headers a visitor could forge to fake their address or reach a hidden route are removed before your app sees the request.</dd></div>
+      <div><dt>Logs without secrets</dt><dd>Passwords, cookies and tokens are stripped from the access log, in headers and in URLs.</dd></div>
+      <div><dt>No stray answers</dt><dd>A request for a hostname you did not configure is dropped, so scanners learn nothing.</dd></div>
+      <div><dt>No 502 during restarts</dt><dd>When you redeploy an app, requests wait up to 30 seconds for it to come back instead of failing.</dd></div>
+      <div><dt>A locked-down proxy</dt><dd>Caddy runs with a read-only filesystem, almost no privileges and no access to the Docker socket.</dd></div>
     </dl>
+    <p class="file">Added to every response</p>
+<pre><code><span class="k">strict-transport-security:</span> max-age=31536000; includeSubDomains
+<span class="k">x-content-type-options:</span> nosniff
+<span class="k">content-security-policy:</span> frame-ancestors 'self'; object-src 'none'; base-uri 'self'
+<span class="k">referrer-policy:</span> strict-origin-when-cross-origin
+<span class="k">permissions-policy:</span> camera=(), microphone=(), geolocation=(), <span class="c">… 14 features off</span>
+<span class="k">cross-origin-opener-policy:</span> same-origin-allow-popups</code></pre>
+    <p>Does your app already send its own Content-Security-Policy? Write <code>import hardened-app-policy 10MB</code> instead, and the last four are left to the app. Every rule is in one <a href="https://github.com/pungoyal/caddy-edge/blob/main/deploy/caddy/Caddyfile">commented Caddyfile</a> you can read in five minutes.</p>
   </div>
 </section>
 
 <section id="deploy">
   <div>
-    <h2>A deploy that cannot leave you down</h2>
-    <p class="sub">CI runs this sequence for real on every change, over SSH against its own runner, <a href="https://github.com/pungoyal/caddy-edge/blob/main/.github/workflows/ci.yml">failure path included</a>.</p>
+    <h2>Deploys you do not have to watch</h2>
+    <p class="sub">Every step below is <a href="https://github.com/pungoyal/caddy-edge/blob/main/.github/workflows/ci.yml">tested with real deploys</a> each time caddy-edge changes, the failure included.</p>
   </div>
   <div class="body">
     <ol class="steps">
-      <li><div><strong>Validate.</strong> <span>The site files are checked against the Caddyfile, then Caddy is started once with internal certificates. No secrets, so it runs on every pull request.</span></div></li>
-      <li><div><strong>Ship three things.</strong> <span><code>compose.yaml</code>, <code>.env</code> and <code>caddy/</code> go to the host over SSH. What was serving is copied to <code>previous/</code> first.</span></div></li>
-      <li><div><strong>Reload, not restart.</strong> <span><code>caddy reload</code> applies the config with no dropped connection. The container is recreated only when the Compose file itself changed.</span></div></li>
-      <li><div><strong>Or put it back.</strong> <span>A config Caddy rejects leaves the old one serving. If the deploy does not come up healthy, <code>previous/</code> is restored and the job fails, with Caddy's log minus the access log.</span></div></li>
+      <li><div><strong>Checked before it ships.</strong> <span>Every pull request and every push is validated by starting Caddy with your config. A typo is caught in GitHub, not on your server.</span></div></li>
+      <li><div><strong>Applied without downtime.</strong> <span>The new config is loaded into the running Caddy. No restart, no dropped connections.</span></div></li>
+      <li><div><strong>Undone if it fails.</strong> <span>If Caddy refuses the config or does not come up healthy, the previous one is put back and the run fails loudly. Your sites keep serving throughout.</span></div></li>
     </ol>
-    <p>The host needs Docker and nothing else. No agent, no script, no tool to install: <code>docker compose ps</code>, <code>logs</code> and <code>restart</code> work by hand in the deploy directory.</p>
+    <p>To go back to an earlier state yourself, revert the commit. On the server there are three files in one directory and nothing else, so <code>docker compose logs</code> and <code>restart</code> work as you expect.</p>
   </div>
 </section>
 
 <section id="form">
   <div>
-    <h2>Adding a site is a form</h2>
-    <p class="sub">Whoever can run workflows in your instance repository is an admin. That is the whole access model.</p>
+    <h2>Add an app without touching a file</h2>
+    <p class="sub">A form in your repository's Actions tab. It works from the GitHub mobile app too.</p>
   </div>
   <div class="body">
-    <p>Run it from the Actions tab, the GitHub mobile app or the command line. Every input is matched against a pattern before it becomes config. The run validates, commits to <code>main</code>, optionally creates the DNS record on Cloudflare, and deploys that commit.</p>
-<pre><code>gh workflow run site.yml \
-  <span class="k">-f</span> action=set <span class="k">-f</span> name=app \
-  <span class="k">-f</span> hostname=app.example.com <span class="k">-f</span> upstream=app:3000 <span class="k">-f</span> dns=true
+    <p>Enter a name, a hostname and where the app listens. The form writes the file, checks it, commits it, creates the DNS record if your domain is on Cloudflare, and deploys. Removing an app is the same form.</p>
+<pre><code><span class="c"># The same thing from a terminal</span>
+gh workflow run site.yml \
+  <span class="k">-f</span> action=set <span class="k">-f</span> name=blog \
+  <span class="k">-f</span> hostname=blog.example.com <span class="k">-f</span> upstream=blog:8080
 
-gh workflow run site.yml <span class="k">-f</span> action=remove <span class="k">-f</span> name=app <span class="k">-f</span> dns=true</code></pre>
-    <p>Anything the form cannot express is a pull request against the site file: the same validation runs, and merging deploys.</p>
+gh workflow run site.yml <span class="k">-f</span> action=remove <span class="k">-f</span> name=blog</code></pre>
+    <p>Only people with write access to your repository can run it. Need something the form does not offer? A site file is ordinary Caddy config, so add any directive by hand.</p>
   </div>
 </section>
 
 <section id="start">
   <div>
-    <h2>Get started</h2>
-    <p class="sub">You need a host with a public IPv4 address and a domain whose DNS you control.</p>
+    <h2>Quick start</h2>
+    <p class="sub">Five steps. Commands use the <a href="https://cli.github.com">GitHub CLI</a>; everything can also be done on github.com. The <a href="https://github.com/pungoyal/caddy-edge/tree/main/examples/instance#readme">full guide</a> has the detail.</p>
   </div>
   <div class="body">
-    <ol class="steps">
-      <li><div><strong>Prepare the host.</strong> <span>Docker Engine 25 or later with the Compose plugin, a deploy user in the <code>docker</code> group, a directory, a Docker network, and ports 80 and 443 open.</span></div></li>
-      <li><div><strong>Create a private repository</strong> <span>from the contents of <a href="https://github.com/pungoyal/caddy-edge/tree/main/examples/instance"><code>examples/instance</code></a>.</span></div></li>
-      <li><div><strong>Give it six variables and a deploy key.</strong> <span>The host's address, SSH user and host key, the deploy directory, the network name and an ACME contact address.</span></div></li>
-      <li><div><strong>Run the <code>site</code> workflow</strong> <span>to serve your first application.</span></div></li>
+    <ol class="guide">
+      <li>
+        <h3>Prepare the server</h3>
+        <p>With Docker Engine 25 or later installed, create the network your apps will share and a directory for caddy-edge. Open ports 80 and 443 in the firewall.</p>
+<pre><code>docker network create edge
+sudo install -d -o "$USER" /opt/edge</code></pre>
+      </li>
+      <li>
+        <h3>Put an app on the network</h3>
+        <p>In the app's own Compose file, join the network. It does not need a <code>ports:</code> entry: Caddy reaches it by service name.</p>
+<pre><code><span class="k">services:</span>
+  <span class="k">app:</span>
+    <span class="k">image:</span> ghcr.io/you/app
+    <span class="k">networks:</span> [edge]
+
+<span class="k">networks:</span>
+  <span class="k">edge:</span>
+    <span class="k">external:</span> true</code></pre>
+      </li>
+      <li>
+        <h3>Create your repository</h3>
+        <p>Run this on your own computer. Keep the repository private: it names your hostnames and your server.</p>
+<pre><code>gh repo create my-edge --private --clone &amp;&amp; cd my-edge
+curl -sL https://github.com/pungoyal/caddy-edge/archive/refs/heads/main.tar.gz |
+  tar -xz --strip-components=3 caddy-edge-main/examples/instance</code></pre>
+      </li>
+      <li>
+        <h3>Tell it where your server is</h3>
+        <p>Replace the address, user and email with yours. The deploy key is created for this purpose only, and its private half goes straight into GitHub's secret store.</p>
+<pre><code>gh api -X PUT "repos/{owner}/{repo}/environments/production"
+gh variable set SSH_HOST --env production --body 203.0.113.10
+gh variable set SSH_USER --env production --body deploy
+gh variable set SSH_KNOWN_HOSTS --env production \
+  --body "$(ssh-keyscan -t ed25519 203.0.113.10 2&gt;/dev/null)"
+gh variable set DEPLOY_PATH --env production --body /opt/edge
+gh variable set DOCKER_NETWORK --env production --body edge
+gh variable set ACME_EMAIL --env production --body you@example.com
+
+ssh-keygen -t ed25519 -f deploy_key -C github-actions -N ""
+gh secret set SSH_PRIVATE_KEY --env production &lt; deploy_key
+ssh-copy-id -f -i deploy_key.pub deploy@203.0.113.10
+rm deploy_key deploy_key.pub</code></pre>
+      </li>
+      <li>
+        <h3>Go live</h3>
+        <p>Point a DNS <code>A</code> record for your hostname at the server. Put the hostname and your app's <code>service:port</code> in <code>sites/app.caddy</code>, then push. When the run finishes, the app answers on HTTPS.</p>
+<pre><code>git add -A &amp;&amp; git commit -m "Serve my first app"
+git push -u origin main
+gh run watch</code></pre>
+      </li>
     </ol>
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/pungoyal/caddy-edge/tree/main/examples/instance#readme">Read the step-by-step guide</a>
-    </div>
-    <p>Or call the actions from workflows of your own:</p>
-<pre><code><span class="k">- uses:</span> pungoyal/caddy-edge/actions/deploy@&lt;commit&gt; <span class="c"># v0.1.0</span>
-  <span class="k">with:</span>
-    <span class="k">sites:</span> sites
-    <span class="k">ssh-host:</span> ${{ vars.SSH_HOST }}
-    <span class="k">ssh-user:</span> ${{ vars.SSH_USER }}
-    <span class="k">ssh-known-hosts:</span> ${{ vars.SSH_KNOWN_HOSTS }}
-    <span class="k">ssh-private-key:</span> ${{ secrets.SSH_PRIVATE_KEY }}
-    <span class="k">deploy-path:</span> ${{ vars.DEPLOY_PATH }}
-    <span class="k">docker-network:</span> ${{ vars.DOCKER_NETWORK }}
-    <span class="k">acme-email:</span> ${{ vars.ACME_EMAIL }}</code></pre>
-    <dl class="rows">
-      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/validate/action.yml"><code>actions/validate</code></a></dt><dd>Checks site files and starts Caddy once with internal certificates.</dd></div>
-      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/deploy/action.yml"><code>actions/deploy</code></a></dt><dd>Ships, reloads, and restores the previous config on failure.</dd></div>
-      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/site/action.yml"><code>actions/site</code></a></dt><dd>Writes or removes one site file from validated inputs.</dd></div>
-      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/dns/action.yml"><code>actions/dns</code></a></dt><dd>Sets or deletes a DNS-only Cloudflare <code>A</code> record. Optional.</dd></div>
-    </dl>
   </div>
 </section>
 
-<section id="not">
+<section id="fit">
   <div>
-    <h2>What it is not</h2>
-    <p class="sub">Know before you adopt it.</p>
+    <h2>Is it for you?</h2>
+    <p class="sub">It does one job. Here is where that job ends.</p>
   </div>
   <div class="body">
-    <dl class="rows">
-      <div><dt>Not a platform</dt><dd>It does not build or deploy your applications. They are their own Compose projects that join the shared network.</dd></div>
-      <div><dt>Not a firewall</dt><dd>No rate limiting, no WAF, no bot rules.</dd></div>
-      <div><dt>Not behind a CDN</dt><dd>Certificates come from HTTP and TLS-ALPN challenges, so the host answers directly and its address is public.</dd></div>
-      <div><dt>Not multi-host</dt><dd>One Caddy on one host.</dd></div>
-      <div><dt>Not low-privilege on the host</dt><dd>The deploy user is in the <code>docker</code> group, which is root. Whoever can run your instance's workflows controls the host. The <a href="https://github.com/pungoyal/caddy-edge/blob/main/SECURITY.md">security policy</a> has the full trust model.</dd></div>
-    </dl>
-    <p>If you would rather have applications declare their own routes with container labels, and no repository in between, use <a href="https://github.com/lucaslorentz/caddy-docker-proxy">caddy-docker-proxy</a> or <a href="https://traefik.io/traefik/">Traefik</a>. The price is giving the proxy the Docker socket.</p>
+    <div class="fit">
+      <div>
+        <h3>A good fit</h3>
+        <ul>
+          <li>A handful of apps on one server, each on its own hostname.</li>
+          <li>You want every change to the proxy reviewed, in git, and reversible.</li>
+          <li>You would rather not give a proxy access to the Docker socket.</li>
+          <li>You deploy your apps yourself and only need the front door.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Look elsewhere</h3>
+        <ul>
+          <li>You need a WAF, rate limiting or bot rules.</li>
+          <li>You want to hide the server behind a CDN proxy. Certificates here require the server to answer directly.</li>
+          <li>You run several servers behind one address.</li>
+          <li>You want apps to appear by container label, with no repository: use <a href="https://github.com/lucaslorentz/caddy-docker-proxy">caddy-docker-proxy</a> or <a href="https://traefik.io/traefik/">Traefik</a>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="questions">
+  <div>
+    <h2>Questions</h2>
+  </div>
+  <div class="body">
+    <details>
+      <summary>What does it cost?</summary>
+      <p>Nothing. caddy-edge is MIT licensed, Caddy is open source, certificates are free, and a deploy uses a few minutes of GitHub Actions time, well inside the free allowance for private repositories.</p>
+    </details>
+    <details>
+      <summary>Do I need Cloudflare?</summary>
+      <p>No. Any DNS provider works if you create the record yourself. With Cloudflare the form can create and delete records for you; they must be DNS-only, not proxied.</p>
+    </details>
+    <details>
+      <summary>How do updates reach me?</summary>
+      <p>Your workflows use caddy-edge at an exact commit, so nothing changes until you say so. <a href="https://docs.renovatebot.com">Renovate</a> opens a pull request when there is a new release, and merging it deploys the update.</p>
+    </details>
+    <details>
+      <summary>What access does GitHub have to my server?</summary>
+      <p>One SSH key for one user, held as a secret in your repository. That user can run Docker, which is equivalent to root, so anyone who can push to your repository controls the server. Keep the repository private and its collaborators few. The <a href="https://github.com/pungoyal/caddy-edge/blob/main/SECURITY.md">security policy</a> spells this out.</p>
+    </details>
+    <details>
+      <summary>Can I use Caddy features this does not mention?</summary>
+      <p>Yes. A site file is plain Caddy config with two imports in it. Add redirects, basic auth, path rules or anything else Caddy supports below them.</p>
+    </details>
+    <details>
+      <summary>What ends up on my server?</summary>
+      <p>One directory holding <code>compose.yaml</code>, <code>.env</code> and <code>caddy/</code>, and one running container. No agent, no scripts, no scheduled jobs.</p>
+    </details>
   </div>
 </section>
 
@@ -374,7 +424,7 @@ gh workflow run site.yml <span class="k">-f</span> action=remove <span class="k"
 
 <footer>
   <p><a href="https://github.com/pungoyal/caddy-edge/blob/main/LICENSE">MIT licence</a>. Caddy is a registered trademark of Stack Holdings GmbH; this project is not affiliated with or endorsed by the Caddy project.</p>
-  <p><a href="https://github.com/pungoyal/caddy-edge/releases">Releases</a> · <a href="https://github.com/pungoyal/caddy-edge/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/pungoyal/caddy-edge/issues">Issues</a></p>
+  <p><a href="https://github.com/pungoyal/caddy-edge#readme">Reference</a> · <a href="https://github.com/pungoyal/caddy-edge/releases">Releases</a> · <a href="https://github.com/pungoyal/caddy-edge/issues">Issues</a></p>
 </footer>
 
 </div>

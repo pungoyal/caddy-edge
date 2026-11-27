@@ -1,6 +1,14 @@
 # An instance repository
 
-Copy this directory into a new **private** repository. It holds what is yours: the site files, the workflows that validate and deploy them, and the variables and secret GitHub keeps for them. Everything else comes from [caddy-edge](https://github.com/pungoyal/caddy-edge) at the commit the workflows pin.
+Copy this directory into a new **private** repository:
+
+```sh
+gh repo create my-edge --private --clone && cd my-edge
+curl -sL https://github.com/pungoyal/caddy-edge/archive/refs/heads/main.tar.gz |
+  tar -xz --strip-components=3 caddy-edge-main/examples/instance
+```
+
+It holds what is yours: the site files, the workflows that validate and deploy them, and the variables and secret GitHub keeps for them. Everything else comes from [caddy-edge](https://github.com/pungoyal/caddy-edge) at the commit the workflows pin.
 
 ```
 sites/                         one *.caddy file per application
