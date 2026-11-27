@@ -18,9 +18,9 @@ Keep it private: the site files name your hosts, and the deploy logs name your s
 - A directory the deploy user can write to, e.g. `/opt/edge`, and a Docker network, e.g. `docker network create edge`. Every application joins this network.
 - Inbound TCP 80 and 443 and UDP 443 open; TCP 22 reachable from GitHub Actions.
 
-## 2. Pin caddy-edge
+## 2. Check the caddy-edge pin
 
-The workflows reference `pungoyal/caddy-edge/actions/…@v0.1.0`. A tag can be moved; replace it with the commit it points at, in the form `@<sha> # v0.1.0`. Renovate does this for you on its first run and moves the pin afterwards.
+The workflows reference `pungoyal/caddy-edge/actions/…@<sha> # v0.1.0`: a commit, because a tag can be moved. Renovate moves the pin when there is a release; the comment is how it knows which one you are on.
 
 ## 3. Variables and the deploy key
 
