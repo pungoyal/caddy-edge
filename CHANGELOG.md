@@ -6,13 +6,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 First public release.
 
-### Added
-
-- `deploy/`: Caddy on Docker Compose, read-only and with every capability dropped except binding ports, and a Caddyfile with the `hardened`, `hardened-app-policy` and `app` snippets, credential-redacted logs and a catch-all that aborts unmatched hostnames.
-- `actions/validate`: checks site files and starts Caddy once with internal certificates.
-- `actions/deploy`: ships Caddy's configuration and your site files to the server over SSH, applies a config change by reload, and restores the previous config when the new one does not come up.
-- `actions/site`: writes or removes a site file from validated inputs.
-- `actions/dns`: creates, updates or deletes a DNS-only Cloudflare `A` record.
-- `examples/instance`: the workflows and layout of a private instance repository.
+- **Caddy for one Docker server**, in `deploy/`: automatic HTTPS, security headers, forged client headers removed, credentials kept out of logs, and requests for unknown hostnames dropped. Caddy runs read-only with every capability dropped except binding ports.
+- **`actions/validate`** checks your site files and starts Caddy once with self-signed certificates.
+- **`actions/deploy`** ships the configuration to your server over SSH, applies it by reload with no dropped connection, and restores the previous configuration if the new one does not come up.
+- **`actions/site`** writes or removes a site file from validated inputs.
+- **`actions/dns`** creates, updates or deletes a DNS-only Cloudflare `A` record.
+- **`examples/instance`** is a ready-made repository to copy: the two workflows, a first site file and a setup guide.
 
 [0.1.0]: https://github.com/pungoyal/caddy-edge/releases/tag/v0.1.0
