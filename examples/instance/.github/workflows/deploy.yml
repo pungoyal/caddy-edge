@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Check the server and show what a deploy would change, without changing anything
+        type: boolean
+        default: false
   # Called by the site workflow, to deploy the commit it has just pushed.
   workflow_call:
     inputs:
@@ -52,3 +57,4 @@ jobs:
           deploy-path: ${{ vars.DEPLOY_PATH }}
           docker-network: ${{ vars.DOCKER_NETWORK }}
           acme-email: ${{ vars.ACME_EMAIL }}
+          dry-run: ${{ inputs.dry_run || false }}

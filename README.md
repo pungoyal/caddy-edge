@@ -113,6 +113,8 @@ The workflow writes the file from the inputs, checks it, commits it and deploys.
 3. **Reloads.** `caddy reload` applies the config with no dropped connection. The container is recreated only when the Compose file itself changed, such as for a new Caddy version.
 4. **Recovers.** If Caddy rejects the config or does not come up healthy, `previous/` is put back and the run fails.
 
+To see what a deploy would do without doing it, run the `deploy` workflow with `dry_run` ticked (`dry-run: true` on the action). It checks the server is ready, prints the difference between what is deployed and what would be, and says whether Caddy would reload or be recreated. It only reads.
+
 Those three files and one container are all that is on the server, so `docker compose ps`, `logs` and `restart` work by hand in the deploy directory. CI runs this sequence, failure included, against a real SSH target on every change to this repository.
 
 ## Actions
@@ -122,7 +124,7 @@ For writing your own workflows instead of using the example's. Pin each to a com
 | Action | What it does |
 | --- | --- |
 | [`actions/validate`](actions/validate/action.yml) | Checks site files and starts Caddy once with self-signed certificates. Needs no secrets. |
-| [`actions/deploy`](actions/deploy/action.yml) | Ships the config to the server, reloads Caddy, and restores the previous config if that fails. |
+| [`actions/deploy`](actions/deploy/action.yml) | Ships the config to the server, reloads Caddy, and restores the previous config if that fails. With `dry-run: true` it only reports what would change. |
 | [`actions/site`](actions/site/action.yml) | Writes or removes one site file. Every input is matched against a pattern before it becomes config. |
 | [`actions/dns`](actions/dns/action.yml) | Creates, updates or deletes a Cloudflare `A` record. |
 

@@ -30,6 +30,15 @@ inputs:
   acme-email:
     description: Contact address for the ACME account.
     required: true
+  dry-run:
+    description: "true: connect to the host, check it is ready and print what a deploy would change, without changing anything."
+    required: false
+    default: "false"
+
+outputs:
+  plan:
+    description: "With dry-run: first (nothing is deployed yet), reload (Caddy would reload the config), recreate (the container would be replaced: a few seconds of downtime) or none (nothing differs)."
+    value: ${{ steps.deploy.outputs.plan }}
 
 runs:
   using: composite
@@ -93,9 +102,12 @@ runs:
     # compose.yaml changed; otherwise the reload applies the config with no dropped
     # connection, and a config Caddy rejects leaves the old one serving.
     - name: Deploy
+      id: deploy
       shell: bash
       env:
         DEPLOY_PATH: ${{ inputs.deploy-path }}
+        DOCKER_NETWORK: ${{ inputs.docker-network }}
+        DRY_RUN: ${{ inputs.dry-run }}
       run: |
         set -o pipefail
         # ssh hands the remote shell one string, so the path is constrained, not quoted.
@@ -103,6 +115,40 @@ runs:
         on_host() { ssh -F "$RUNNER_TEMP/edge-ssh/config" edge "cd $DEPLOY_PATH && $1"; }
         put() { echo "mkdir -p caddy && find caddy -mindepth 1 -delete && cp -a $1/compose.yaml $1/.env $1/caddy ."; }
         up='docker compose up -d --quiet-pull --remove-orphans --wait --wait-timeout 60 && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile'
+
+        if [[ $DRY_RUN == true ]]; then
+          # Every command here only reads. The comparison happens on the runner, so
+          # nothing is written to the host, not even a temporary file.
+          [[ $DOCKER_NETWORK =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || { echo "::error::invalid docker-network" >&2; exit 1; }
+          on_host 'test -w .' || { echo "::error::deploy-path is missing or not writable by the SSH user" >&2; exit 1; }
+          on_host 'docker compose version' || { echo "::error::the SSH user cannot run docker compose" >&2; exit 1; }
+          on_host "docker network inspect $DOCKER_NETWORK >/dev/null" || { echo "::error::the Docker network does not exist on the host" >&2; exit 1; }
+          new=$RUNNER_TEMP/edge cur=$RUNNER_TEMP/edge-current
+          rm -rf "$cur" && mkdir "$cur"
+          if on_host 'test ! -f compose.yaml'; then
+            plan=first
+            echo "Nothing is deployed here yet: this would be the first deploy."
+          else
+            on_host 'docker compose ps'
+            on_host 'tar -cf - compose.yaml .env caddy' | tar -xf - -C "$cur"
+            # .env is compared, not printed: a job log is no place for its values.
+            if ! cmp -s "$cur/compose.yaml" "$new/compose.yaml" || ! cmp -s "$cur/.env" "$new/.env"; then
+              plan=recreate
+              echo "compose.yaml or .env differs: Caddy would be recreated, and sites would drop for a few seconds."
+            elif ! diff -rq "$cur/caddy" "$new/caddy" >/dev/null; then
+              plan=reload
+              echo "Only the Caddy config differs: Caddy would reload it, with no dropped connection."
+            else
+              plan=none
+              echo "Nothing differs from what is deployed."
+            fi
+            diff -u "$cur/compose.yaml" "$new/compose.yaml" || true
+            diff -ruN "$cur/caddy" "$new/caddy" || true
+          fi
+          rm -rf "$cur"
+          echo "plan=$plan" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
 
         on_host 'rm -rf previous next && mkdir previous next'
         # Nothing serves yet on the first deploy. Tested there: here a failed connection

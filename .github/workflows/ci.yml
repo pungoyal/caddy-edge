@@ -83,6 +83,28 @@ jobs:
             echo "END_OF_KEY"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Dry run before anything is deployed
+        id: dry-first
+        uses: ./actions/deploy
+        with:
+          sites: e2e-sites
+          ssh-host: 127.0.0.1
+          ssh-user: ${{ steps.target.outputs.user }}
+          ssh-private-key: ${{ steps.target.outputs.key }}
+          ssh-known-hosts: ${{ steps.target.outputs.known_hosts }}
+          deploy-path: /opt/edge-e2e
+          docker-network: edge
+          acme-email: e2e@example.invalid
+          dry-run: true
+
+      - name: It reported a first deploy and left the host empty
+        env:
+          PLAN: ${{ steps.dry-first.outputs.plan }}
+        run: |
+          [[ $PLAN == first ]]
+          [[ -z $(ls -A /opt/edge-e2e) ]]
+          [[ -z $(docker ps -aq --filter name=edge-caddy) ]]
+
       - name: First deploy
         uses: ./actions/deploy
         with: &target
@@ -110,6 +132,29 @@ jobs:
           cp test/sites/v2/localhost.caddy e2e-sites/
           # The deploy key did not stay behind.
           test ! -e "$RUNNER_TEMP/edge-ssh"
+
+      - name: Dry run of a config change
+        id: dry-change
+        uses: ./actions/deploy
+        with:
+          sites: e2e-sites
+          ssh-host: 127.0.0.1
+          ssh-user: ${{ steps.target.outputs.user }}
+          ssh-private-key: ${{ steps.target.outputs.key }}
+          ssh-known-hosts: ${{ steps.target.outputs.known_hosts }}
+          deploy-path: /opt/edge-e2e
+          docker-network: edge
+          acme-email: e2e@example.invalid
+          dry-run: true
+
+      - name: It reported a reload and changed nothing
+        env:
+          PLAN: ${{ steps.dry-change.outputs.plan }}
+        run: |
+          [[ $PLAN == reload ]]
+          [[ $(curl -sk --max-time 10 --resolve localhost:443:127.0.0.1 https://localhost/) == v1 ]]
+          diff test/sites/v1/localhost.caddy /opt/edge-e2e/caddy/sites/localhost.caddy
+          test ! -e /opt/edge-e2e/previous/compose.yaml
 
       - name: Second deploy, a config change
         uses: ./actions/deploy

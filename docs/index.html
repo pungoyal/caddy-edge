@@ -259,6 +259,7 @@ details p { margin-top: 0.5rem; color: var(--muted); }
       <li><div><strong>Applied without downtime.</strong> <span>The new config is loaded into the running Caddy. No restart, no dropped connections.</span></div></li>
       <li><div><strong>Undone if it fails.</strong> <span>If Caddy refuses the config or does not come up healthy, the previous one is put back and the run fails loudly. Your sites keep serving throughout.</span></div></li>
     </ol>
+    <p>Want to look before you leap? A dry run connects to the server, checks it is ready, and shows exactly what a deploy would change, without changing anything.</p>
     <p>To go back to an earlier state yourself, revert the commit. On the server there are three files in one directory and nothing else, so <code>docker compose logs</code> and <code>restart</code> work as you expect.</p>
   </div>
 </section>

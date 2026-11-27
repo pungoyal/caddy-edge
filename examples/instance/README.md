@@ -112,6 +112,12 @@ gh workflow run site.yml -f action=remove -f name=blog
 
 **Write a site file by hand** with the [site file reference](https://github.com/pungoyal/caddy-edge/blob/main/deploy/caddy/sites/README.md).
 
+**Rehearse a deploy** with a dry run. It connects to the server, checks that Docker, the network and the directory are ready, and prints what would change and whether Caddy would reload or be recreated. Nothing on the server is touched.
+
+```sh
+gh workflow run deploy.yml -f dry_run=true
+```
+
 **Undo a change** by reverting its commit, or by re-running the `deploy` job of an earlier commit from the Actions tab.
 
 **Update caddy-edge** by merging the pull request Renovate opens (install the [Renovate app](https://github.com/apps/renovate) on this repository). Read the [changelog](https://github.com/pungoyal/caddy-edge/blob/main/CHANGELOG.md) first when the minor version changes.
