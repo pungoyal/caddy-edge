@@ -1,0 +1,60 @@
+name: Write a caddy-edge site
+description: Writes or removes one site file from validated inputs. The caller commits the result.
+
+inputs:
+  sites:
+    description: Directory of *.caddy site files in the workspace.
+    required: true
+  action:
+    description: set adds a site or updates one; remove deletes it.
+    required: true
+  name:
+    description: Site name, which is the file name without .caddy.
+    required: true
+  hostname:
+    description: "set: hostname to serve."
+    required: false
+  upstream:
+    description: "set: container:port on the shared Docker network."
+    required: false
+  policy:
+    description: "set: hardened if the edge writes the document policy, hardened-app-policy if the app ships its own."
+    required: false
+    default: hardened
+  frame-ancestors:
+    description: "set, hardened only: 'self' or 'none', with the apostrophes."
+    required: false
+    default: "'self'"
+  max-body:
+    description: "set: largest request body."
+    required: false
+    default: 10MB
+
+outputs:
+  hostname:
+    description: The hostname the site serves, or served before it was removed.
+    value: ${{ steps.write.outputs.hostname }}
+
+runs:
+  using: composite
+  steps:
+    - id: write
+      shell: bash
+      # Via env, not expanded into the script, so contents cannot alter commands.
+      env:
+        SITES: ${{ inputs.sites }}
+        ACTION: ${{ inputs.action }}
+        NAME: ${{ inputs.name }}
+        HOSTNAME_IN: ${{ inputs.hostname }}
+        UPSTREAM: ${{ inputs.upstream }}
+        POLICY: ${{ inputs.policy }}
+        FRAME_ANCESTORS: ${{ inputs.frame-ancestors }}
+        MAX_BODY: ${{ inputs.max-body }}
+      run: |
+        site=$GITHUB_ACTION_PATH/../../scripts/site.sh
+        case $ACTION in
+          set) host=$("$site" set "$NAME" "$HOSTNAME_IN" "$UPSTREAM" "$POLICY" "$MAX_BODY" "$FRAME_ANCESTORS") ;;
+          remove) host=$("$site" remove "$NAME") ;;
+          *) echo "::error::action must be set or remove" >&2; exit 1 ;;
+        esac
+        echo "hostname=$host" >> "$GITHUB_OUTPUT"

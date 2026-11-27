@@ -1,0 +1,6 @@
+# Test fixture, not a model for a site: `localhost` gets a certificate from Caddy's
+# internal CA, and `respond` stands in for an application.
+localhost {
+	import hardened 10MB 'self'
+	respond "v2"
+}

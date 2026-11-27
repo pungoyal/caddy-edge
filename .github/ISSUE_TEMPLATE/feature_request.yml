@@ -1,0 +1,19 @@
+name: Feature request
+description: Something the edge should do, or should stop doing
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The situation, not the solution. What can't you do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you change?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried instead?

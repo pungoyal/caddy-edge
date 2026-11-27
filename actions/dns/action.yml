@@ -1,0 +1,37 @@
+name: Set a caddy-edge DNS record
+description: Creates, updates or deletes a DNS-only Cloudflare A record for a hostname the edge serves.
+
+inputs:
+  action:
+    description: set or delete.
+    required: true
+  hostname:
+    description: The record's name.
+    required: true
+  ip:
+    description: "set: the host's IPv4 address."
+    required: false
+  cloudflare-api-token:
+    description: Token with Zone:DNS:Edit on the zone.
+    required: true
+  cloudflare-zone-id:
+    description: The zone's ID.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        CF_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CF_ZONE_ID: ${{ inputs.cloudflare-zone-id }}
+        ACTION: ${{ inputs.action }}
+        HOST: ${{ inputs.hostname }}
+        IP: ${{ inputs.ip }}
+      run: |
+        dns=$GITHUB_ACTION_PATH/../../scripts/dns.sh
+        case $ACTION in
+          set) "$dns" set "$HOST" "$IP" ;;
+          delete) "$dns" delete "$HOST" ;;
+          *) echo "::error::action must be set or delete" >&2; exit 1 ;;
+        esac

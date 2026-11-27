@@ -1,0 +1,54 @@
+name: deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # The site workflow deploys the commit it just pushed, which is not the one it started on.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: pungoyal/caddy-edge/actions/validate@v0.1.0
+        with:
+          sites: sites
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    # On the job, not the workflow: a pull request's run must not displace a waiting deploy.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: pungoyal/caddy-edge/actions/deploy@v0.1.0
+        with:
+          sites: sites
+          ssh-host: ${{ vars.SSH_HOST }}
+          ssh-user: ${{ vars.SSH_USER }}
+          ssh-known-hosts: ${{ vars.SSH_KNOWN_HOSTS }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          deploy-path: ${{ vars.DEPLOY_PATH }}
+          docker-network: ${{ vars.DOCKER_NETWORK }}
+          acme-email: ${{ vars.ACME_EMAIL }}

@@ -1,0 +1,122 @@
+name: site
+run-name: ${{ inputs.action }} ${{ inputs.name }}
+
+# The admin interface: whoever may run this workflow may change what the edge serves.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: set adds a site or updates one; remove stops serving it
+        type: choice
+        options: [set, remove]
+        required: true
+      name:
+        description: Site name, the file in sites/ (e.g. app)
+        required: true
+      hostname:
+        description: "set: hostname to serve (e.g. app.example.com)"
+      upstream:
+        description: "set: container:port on the shared Docker network (e.g. app:3000)"
+      policy:
+        description: "set: hardened if the edge writes the CSP, hardened-app-policy if the app ships its own"
+        type: choice
+        options: [hardened, hardened-app-policy]
+        default: hardened
+      frame_ancestors:
+        description: "set, hardened only: who may embed the site"
+        type: choice
+        options: ["'self'", "'none'"]
+        default: "'self'"
+      max_body:
+        description: "set: largest request body"
+        default: 10MB
+      dns:
+        description: Also create (set) or delete (remove) the Cloudflare A record
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One at a time: two runs would both commit onto the same main.
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+jobs:
+  write:
+    # A run from another branch would push that branch's files to main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      hostname: ${{ steps.site.outputs.hostname }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: site
+        uses: pungoyal/caddy-edge/actions/site@v0.1.0
+        with:
+          sites: sites
+          action: ${{ inputs.action }}
+          name: ${{ inputs.name }}
+          hostname: ${{ inputs.hostname }}
+          upstream: ${{ inputs.upstream }}
+          policy: ${{ inputs.policy }}
+          frame-ancestors: ${{ inputs.frame_ancestors }}
+          max-body: ${{ inputs.max_body }}
+
+      # Before the commit, so a config Caddy rejects never reaches main.
+      - uses: pungoyal/caddy-edge/actions/validate@v0.1.0
+        with:
+          sites: sites
+
+      - name: Commit to main
+        id: commit
+        # Via env, not expanded into the script, so contents cannot alter commands.
+        env:
+          ACTION: ${{ inputs.action }}
+          NAME: ${{ inputs.name }}
+          HOST: ${{ steps.site.outputs.hostname }}
+          UPSTREAM: ${{ inputs.upstream }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          git add -A sites
+          if git diff --cached --quiet; then
+            echo "::notice::$NAME is already configured this way; deploying main as it is"
+          else
+            if [[ $ACTION == set ]]; then message="Serve $HOST from $UPSTREAM"; else message="$HOST is no longer served"; fi
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -q -m "$message" -m "Run from the site form by $ACTOR."
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  dns:
+    if: inputs.dns
+    needs: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # For SSH_HOST: the record points at the host the deploy goes to.
+    environment: production
+    steps:
+      - uses: pungoyal/caddy-edge/actions/dns@v0.1.0
+        with:
+          action: ${{ inputs.action == 'set' && 'set' || 'delete' }}
+          hostname: ${{ needs.write.outputs.hostname }}
+          ip: ${{ vars.SSH_HOST }}
+          cloudflare-api-token: ${{ secrets.CF_API_TOKEN }}
+          cloudflare-zone-id: ${{ secrets.CF_ZONE_ID }}
+
+  # A push made with the workflow's token starts no other workflow, so this run
+  # deploys the commit itself. After dns, so Caddy can obtain the certificate at once.
+  deploy:
+    needs: [write, dns]
+    if: ${{ !failure() && !cancelled() && needs.write.result == 'success' }}
+    uses: ./.github/workflows/deploy.yml
+    with:
+      ref: ${{ needs.write.outputs.sha }}
+    secrets: inherit

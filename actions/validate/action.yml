@@ -1,0 +1,32 @@
+name: Validate caddy-edge sites
+description: Checks site files against the edge's Caddyfile and starts Caddy once with internal certificates.
+
+inputs:
+  sites:
+    description: Directory of *.caddy site files in the workspace. Empty validates the edge alone.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        SITES: ${{ inputs.sites }}
+        # Its own project and network, so a runner that also hosts an edge is left alone.
+        COMPOSE_PROJECT_NAME: edge-validate
+        DOCKER_NETWORK: edge-validate
+        ACME_EMAIL: validate@example.invalid
+      run: |
+        out=$RUNNER_TEMP/edge-validate
+        "$GITHUB_ACTION_PATH/../assemble.sh" "$SITES" "$out"
+        cd "$out"
+        docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1 || docker network create "$DOCKER_NETWORK" >/dev/null
+        docker compose run --quiet-pull --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile
+
+        # Started with internal certificates: the unedited config would order real ones
+        # for the caller's hostnames from the runner.
+        sed -i 's/^\tskip_install_trust$/&\n\tlocal_certs/' caddy/Caddyfile
+        grep -q local_certs caddy/Caddyfile
+        trap 'docker compose down -v >/dev/null 2>&1; docker network rm "$DOCKER_NETWORK" >/dev/null 2>&1 || true' EXIT
+        docker compose up --quiet-pull --wait --wait-timeout 60

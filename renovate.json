@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    { "matchPackageNames": ["*"], "minimumReleaseAge": "7 days" },
+    { "matchDatasources": ["docker"], "minimumReleaseAge": null },
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "pinDigest"],
+      "groupName": "everything short of a major",
+      "automerge": true
+    }
+  ]
+}

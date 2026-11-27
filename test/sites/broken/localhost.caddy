@@ -1,0 +1,4 @@
+# Test fixture: a config Caddy rejects, to prove a failed deploy leaves the old one serving.
+localhost {
+	no_such_directive
+}

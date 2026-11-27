@@ -1,0 +1,138 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: shellcheck scripts/*.sh actions/*.sh test/*.sh
+      - run: test/site_test.sh
+      - name: actionlint (this repository)
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
+      # site.yml calls ./.github/workflows/deploy.yml, which is beside it in an instance
+      # repository and not at this repository's root, where actionlint looks.
+      - name: actionlint (the example instance)
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color -ignore "could not read reusable workflow file" examples/instance/.github/workflows/deploy.yml examples/instance/.github/workflows/site.yml
+
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        sites: ["", test/sites/v1, examples/instance/sites]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/validate
+        with:
+          sites: ${{ matrix.sites }}
+
+  # The deploy action against the runner itself: sshd on loopback stands in for the
+  # VM, and `localhost` sites get certificates from Caddy's internal CA.
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Make the runner a deploy target
+        id: target
+        run: |
+          command -v sshd >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq openssh-server; }
+          sudo systemctl start ssh
+          ssh-keygen -q -t ed25519 -N "" -f "$RUNNER_TEMP/e2e_key"
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          cat "$RUNNER_TEMP/e2e_key.pub" >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+          # sshd refuses keys under a home that others can write to.
+          chmod go-w ~
+          sudo install -d -o "$USER" /opt/edge-e2e
+          docker network create edge
+          # A throwaway key for this runner, but a private key in a public log still
+          # sets off every scanner that reads it.
+          while read -r line; do echo "::add-mask::$line"; done < "$RUNNER_TEMP/e2e_key"
+          cp -r test/sites/v1 e2e-sites
+          {
+            echo "user=$USER"
+            echo "known_hosts=$(ssh-keyscan -t ed25519 127.0.0.1 2>/dev/null)"
+            echo "key<<END_OF_KEY"
+            cat "$RUNNER_TEMP/e2e_key"
+            echo "END_OF_KEY"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: First deploy
+        uses: ./actions/deploy
+        with: &target
+          sites: e2e-sites
+          ssh-host: 127.0.0.1
+          ssh-user: ${{ steps.target.outputs.user }}
+          ssh-private-key: ${{ steps.target.outputs.key }}
+          ssh-known-hosts: ${{ steps.target.outputs.known_hosts }}
+          deploy-path: /opt/edge-e2e
+          docker-network: edge
+          acme-email: e2e@example.invalid
+
+      - name: It serves the site, hardened, and nothing else
+        run: |
+          get() { curl -sk --max-time 10 --resolve localhost:443:127.0.0.1 "$@"; }
+          [[ $(get https://localhost/) == v1 ]]
+          headers=$(get -I https://localhost/)
+          grep -qi '^strict-transport-security: max-age=31536000' <<< "$headers"
+          grep -qi "^content-security-policy: frame-ancestors 'self'" <<< "$headers"
+          if grep -qi '^server:' <<< "$headers"; then exit 1; fi
+          # Unmatched names are aborted, not answered.
+          if curl -sk --max-time 10 https://127.0.0.1/; then exit 1; fi
+          if curl -s --max-time 10 -H 'Host: other.example' http://127.0.0.1/; then exit 1; fi
+          docker inspect -f '{{.Id}}' edge-caddy-1 > "$RUNNER_TEMP/caddy_id"
+          cp test/sites/v2/localhost.caddy e2e-sites/
+          # The deploy key did not stay behind.
+          test ! -e "$RUNNER_TEMP/edge-ssh"
+
+      - name: Second deploy, a config change
+        uses: ./actions/deploy
+        with: *target
+
+      - name: It was applied by a reload, not a restart
+        run: |
+          [[ $(curl -sk --max-time 10 --resolve localhost:443:127.0.0.1 https://localhost/) == v2 ]]
+          [[ $(docker inspect -f '{{.Id}}' edge-caddy-1) == $(cat "$RUNNER_TEMP/caddy_id") ]]
+          diff test/sites/v1/localhost.caddy /opt/edge-e2e/previous/caddy/sites/localhost.caddy
+          cp test/sites/broken/localhost.caddy e2e-sites/
+
+      - name: Third deploy, a config Caddy rejects
+        id: broken
+        continue-on-error: true
+        uses: ./actions/deploy
+        with: *target
+
+      - name: It failed, and the previous config is back and serving
+        env:
+          OUTCOME: ${{ steps.broken.outcome }}
+        run: |
+          [[ $OUTCOME == failure ]]
+          [[ $(curl -sk --max-time 10 --resolve localhost:443:127.0.0.1 https://localhost/) == v2 ]]
+          diff test/sites/v2/localhost.caddy /opt/edge-e2e/caddy/sites/localhost.caddy
+          [[ $(docker inspect -f '{{.Id}}' edge-caddy-1) == $(cat "$RUNNER_TEMP/caddy_id") ]]

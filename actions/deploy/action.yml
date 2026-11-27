@@ -1,0 +1,126 @@
+name: Deploy caddy-edge
+description: Ships the edge and the caller's site files to a Docker host over SSH and reloads Caddy, restoring the previous config if that fails.
+
+inputs:
+  sites:
+    description: Directory of *.caddy site files in the workspace.
+    required: true
+  ssh-host:
+    description: Address of the Docker host.
+    required: true
+  ssh-user:
+    description: SSH user on the host, in the docker group.
+    required: true
+  ssh-port:
+    description: SSH port.
+    required: false
+    default: "22"
+  ssh-private-key:
+    description: Private half of the deploy key.
+    required: true
+  ssh-known-hosts:
+    description: The host's known_hosts line(s), e.g. from ssh-keyscan -t ed25519.
+    required: true
+  deploy-path:
+    description: Absolute directory on the host the edge lives in. It must exist and be writable by the SSH user.
+    required: true
+  docker-network:
+    description: Existing Docker network that Caddy and every application join.
+    required: true
+  acme-email:
+    description: Contact address for the ACME account.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # A new variable is one line in deploy/.env.example and one in this env.
+    - name: Assemble
+      shell: bash
+      env:
+        SITES: ${{ inputs.sites }}
+        DOCKER_NETWORK: ${{ inputs.docker-network }}
+        ACME_EMAIL: ${{ inputs.acme-email }}
+      run: |
+        [[ -n $SITES ]] || { echo "::error::sites is required" >&2; exit 1; }
+        "$GITHUB_ACTION_PATH/../assemble.sh" "$SITES" "$RUNNER_TEMP/edge"
+        cd "$RUNNER_TEMP/edge"
+        umask 077
+        for k in $(grep -oE '^[A-Z][A-Z0-9_]*' .env.example); do
+          v=${!k-}
+          if [[ $v == *"'"* || $v == *$'\n'* ]]; then
+            echo "::error::$k contains a quote or a newline" >&2
+            exit 1
+          fi
+          printf "%s='%s'\n" "$k" "$v"
+        done > .env
+        rm .env.example
+        docker compose config -q
+
+    # Via env, not expanded into the script, so contents cannot alter commands. In its
+    # own directory with -F, so the job's ~/.ssh is neither read nor changed.
+    - name: Configure SSH
+      shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
+        SSH_HOST: ${{ inputs.ssh-host }}
+        SSH_USER: ${{ inputs.ssh-user }}
+        SSH_PORT: ${{ inputs.ssh-port }}
+      run: |
+        # Each becomes a line of ssh_config, where a newline would start another option.
+        [[ $SSH_HOST =~ ^[A-Za-z0-9._:-]+$ ]] || { echo "::error::invalid ssh-host" >&2; exit 1; }
+        [[ $SSH_USER =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || { echo "::error::invalid ssh-user" >&2; exit 1; }
+        [[ $SSH_PORT =~ ^[0-9]{1,5}$ ]] || { echo "::error::invalid ssh-port" >&2; exit 1; }
+        dir=$RUNNER_TEMP/edge-ssh
+        rm -rf "$dir" && mkdir -m 700 "$dir"
+        umask 077
+        printf '%s\n' "$SSH_PRIVATE_KEY" > "$dir/key"
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > "$dir/known_hosts"
+        {
+          echo "Host vm"
+          echo "  HostName $SSH_HOST"
+          echo "  User $SSH_USER"
+          echo "  Port $SSH_PORT"
+          echo "  IdentityFile $dir/key"
+          echo "  IdentitiesOnly yes"
+          echo "  StrictHostKeyChecking yes"
+          echo "  UserKnownHostsFile $dir/known_hosts"
+        } > "$dir/config"
+
+    # caddy/ is emptied and refilled, never replaced: the container mounts that directory,
+    # and a new one would leave it reading the old. `up` recreates Caddy only when
+    # compose.yaml changed; otherwise the reload applies the config with no dropped
+    # connection, and a config Caddy rejects leaves the old one serving.
+    - name: Deploy
+      shell: bash
+      env:
+        DEPLOY_PATH: ${{ inputs.deploy-path }}
+      run: |
+        set -o pipefail
+        # ssh hands the remote shell one string, so the path is constrained, not quoted.
+        [[ $DEPLOY_PATH =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "::error::invalid deploy-path" >&2; exit 1; }
+        vm() { ssh -F "$RUNNER_TEMP/edge-ssh/config" vm "cd $DEPLOY_PATH && $1"; }
+        put() { echo "mkdir -p caddy && find caddy -mindepth 1 -delete && cp -a $1/compose.yaml $1/.env $1/caddy ."; }
+        up='docker compose up -d --quiet-pull --remove-orphans --wait --wait-timeout 60 && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile'
+
+        vm 'rm -rf previous next && mkdir previous next'
+        # Nothing serves yet on the first deploy. Tested there: here a failed connection
+        # would read as a missing file.
+        vm 'test ! -f compose.yaml || cp -a compose.yaml .env caddy previous/'
+        # -p: Caddy runs without DAC_OVERRIDE, and the login umask may hide the files from it.
+        tar -C "$RUNNER_TEMP/edge" -cf - compose.yaml .env caddy | vm 'tar -xpf - -C next'
+        vm "$(put next) && $up" || {
+          # Without the access log: it holds visitors' addresses and URLs, and this job's
+          # log may be public.
+          vm 'docker compose logs --no-log-prefix --tail=500 2>&1 | grep -v "\"logger\":\"http.log.access" | tail -n 50' || true
+          vm 'test ! -f previous/compose.yaml' || vm "$(put previous) && $up" || true
+          exit 1
+        }
+        # Only Caddy's: the server is shared, and other projects keep images to roll back to.
+        vm 'rm -rf next; docker image prune -af --filter label=org.opencontainers.image.title=Caddy' || true
+
+    - name: Remove the deploy key
+      if: always()
+      shell: bash
+      run: rm -rf "$RUNNER_TEMP/edge-ssh"

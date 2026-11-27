@@ -1,0 +1,151 @@
+# Strips credentials from logs. Caddy masks only Authorization, Proxy-Authorization,
+# Cookie and Set-Cookie, and logs app-specific token headers verbatim. Imported by
+# both loggers because reverse_proxy warnings and http.log.error entries go through
+# the default logger with full request headers. Header keys use Go's canonical form.
+# request_token is Kite Connect's login redirect parameter.
+(redact-credentials) {
+	format filter {
+		wrap json
+		request>headers>Authorization delete
+		request>headers>Proxy-Authorization delete
+		request>headers>Cookie delete
+		request>headers>X-Grafana-Service-Account-Token delete
+		request>headers>X-Grafana-Api-Key delete
+		request>uri query {
+			delete access_token
+			delete auth_token
+			delete token
+			delete api_key
+			delete apikey
+			delete request_token
+		}
+		resp_headers>Set-Cookie delete
+	}
+}
+
+{
+	# The ACME account contact. From the environment so the config carries no address.
+	email {$ACME_EMAIL}
+
+	# Loopback only, so an edit or CADDY_ADMIN cannot widen it.
+	admin 127.0.0.1:2019
+
+	# The container trust store is read-only.
+	skip_install_trust
+
+	# Caddy has no HTTP timeouts by default (slowloris). Writes are bounded by the default
+	# 1m write_idle: a `write` ceiling makes every WebSocket that outlives it panic as it
+	# closes (caddyserver/caddy#8151).
+	servers {
+		timeouts {
+			read_body 30s
+			read_header 10s
+			idle 2m
+		}
+	}
+
+	log {
+		output stderr
+		import redact-credentials
+	}
+}
+
+# The edge owns the connection (hardened-app-policy, every site); exactly one party
+# owns the document policy per site, chosen statically by which snippet is imported:
+#
+#   import hardened <max_request_body> <frame_ancestors>   edge owns it
+#   import hardened-app-policy <max_request_body>          app owns it
+#
+# Static, never inferred from the response: a `?Header` default fires only on
+# routes where the app stayed silent (Grafana sets X-Frame-Options from its API
+# handlers but not its static handler), giving one origin two policies.
+
+# For apps that ship their own policy, and the base of `hardened`. Fields are
+# omitted, not deleted: a `-Content-Security-Policy` op runs after the proxy and
+# would strip the app's header too.
+(hardened-app-policy) {
+	# Caddy resets X-Forwarded-For/Host/Proto but forwards other client-supplied
+	# identity and routing headers, which apps may trust (X-Real-IP) or route on
+	# (X-Original-URL, X-Rewrite-URL).
+	request_header -X-Real-IP
+	request_header -X-Client-IP
+	request_header -X-Forwarded-Port
+	request_header -X-Forwarded-Prefix
+	request_header -X-Forwarded-Server
+	request_header -CF-Connecting-IP
+	request_header -True-Client-IP
+	request_header -Forwarded
+	request_header -X-Original-URL
+	request_header -X-Rewrite-URL
+
+	header {
+		# No `preload`: irreversible, and needs the apex.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+
+		# Fingerprints. reverse_proxy adds `Via` itself.
+		-Server
+		-X-Powered-By
+		-Via
+
+		# Removed from all browsers; OWASP says delete it. Grafana still sends it.
+		-X-XSS-Protection
+
+		# Run after the proxy so these replace the app's values instead of appending.
+		defer
+	}
+
+	request_body {
+		max_size {args[0]}
+	}
+
+	# Responses an app already encoded pass through untouched.
+	encode zstd gzip
+
+	log {
+		import redact-credentials
+	}
+}
+
+# Edge-authored document policy. {args[1]} is a CSP source list with apostrophes:
+# `'self'` or `'none'`. No X-Frame-Options: a second encoding can disagree, and
+# browsers prefer frame-ancestors anyway. An app's own X-Frame-Options passes through.
+(hardened) {
+	import hardened-app-policy {args[0]}
+
+	header {
+		# Not a content policy: the edge cannot know an app's script origins.
+		# `base-uri 'self'` because Grafana serves <base href="/">.
+		Content-Security-Policy "frame-ancestors {args[1]}; object-src 'none'; base-uri 'self'"
+		Referrer-Policy "strict-origin-when-cross-origin"
+
+		# `fullscreen` is absent: Grafana panels use it.
+		Permissions-Policy "accelerometer=(), autoplay=(), browsing-topics=(), camera=(), display-capture=(), encrypted-media=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), serial=(), usb=()"
+
+		# `-allow-popups` keeps OAuth popups working.
+		Cross-Origin-Opener-Policy "same-origin-allow-popups"
+
+		defer
+	}
+}
+
+# Apps are recreated on deploy and nothing listens for a few seconds. Retry failed
+# connects (webhooks are sent once) instead of answering 502.
+(app) {
+	reverse_proxy {args[0]} {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
+}
+
+import sites/*.caddy
+
+# Without these Caddy answers 200 for any Host header.
+:80 {
+	abort
+}
+
+:443 {
+	tls internal
+	abort
+}

@@ -1,0 +1,4 @@
+app.example.com {
+	import hardened 10MB 'self'
+	import app app:3000
+}
