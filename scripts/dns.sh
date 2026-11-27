@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Cloudflare A records for hosts on this VM (DNS-only, never proxied).
+# Cloudflare A records for the hostnames an edge serves. DNS-only, never proxied:
+# Caddy answers the certificate challenges itself.
 #
 #   dns.sh set <name> <ip>    create or update A record
 #   dns.sh delete <name>      remove A record

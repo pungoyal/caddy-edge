@@ -12,5 +12,6 @@
 - An action's inputs are its public interface. Removing or renaming one is a breaking change: note it in `CHANGELOG.md` and bump the minor version while below 1.0.
 - A behaviour of the `deploy` action is only done when the `deploy` job in `ci.yml` asserts it.
 - Actions are pinned to a commit SHA and images to a digest. Renovate moves them; do not bump by hand. If an update is wrong, fix `renovate.json`.
-- Docs (`README.md`, `deploy/caddy/sites/README.md`, `examples/instance/README.md`, this file) change in the same PR as what they describe.
+- Docs (`README.md`, `deploy/caddy/sites/README.md`, `examples/instance/README.md`, `docs/index.html`, this file) change in the same PR as what they describe.
+- `docs/` is the GitHub Pages site, served as it is from `main`: one HTML file, no build, no external requests. It states nothing the README does not.
 - Comments say why, or what not to change back. PR titles state the end state.

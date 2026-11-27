@@ -5,6 +5,8 @@
 
 A hardened [Caddy](https://caddyserver.com) reverse proxy for one Docker host, kept in git and deployed by GitHub Actions. Every application gets HTTPS, security headers and a credential-free access log from a four-line file, and adding one is a form.
 
+**[pungoyal.github.io/caddy-edge](https://pungoyal.github.io/caddy-edge/)** is the overview; this file is the reference.
+
 ```
                  your private instance repo                      your Docker host
         ┌──────────────────────────────────────┐          ┌───────────────────────────┐

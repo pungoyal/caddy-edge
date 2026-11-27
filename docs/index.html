@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>caddy-edge: a hardened HTTPS edge for one Docker host</title>
+<meta name="description" content="A hardened Caddy reverse proxy for one Docker host, kept in git and deployed by GitHub Actions. Each application is a four-line file, and adding one is a form.">
+<link rel="canonical" href="https://pungoyal.github.io/caddy-edge/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="caddy-edge">
+<meta property="og:description" content="A hardened HTTPS edge for one Docker host. Each application is a four-line file, and adding one is a form.">
+<meta property="og:url" content="https://pungoyal.github.io/caddy-edge/">
+<meta property="og:image" content="https://pungoyal.github.io/caddy-edge/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101412'/%3E%3Cpath d='M9 8v16M15 12l6 4-6 4' fill='none' stroke='%2345d08a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fbfaf7;
+  --surface: #f2f0ea;
+  --line: #dedbd1;
+  --text: #171a18;
+  --muted: #5c625e;
+  --accent: #0b7a48;
+  --code-bg: #101412;
+  --code-text: #e4e8e5;
+  --code-dim: #8b958f;
+  --code-key: #6fdca4;
+  --code-str: #f0c674;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d100e;
+    --surface: #151917;
+    --line: #272d29;
+    --text: #e8ebe8;
+    --muted: #9aa39d;
+    --accent: #45d08a;
+    --code-bg: #151917;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 1.0625rem/1.6 var(--sans);
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+code, pre, kbd { font-family: var(--mono); }
+:not(pre) > code { font-size: 0.9em; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0.08em 0.35em; white-space: nowrap; }
+h1, h2, h3, p, ul, ol, dl, dd, pre, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+
+.wrap { max-width: 68rem; margin-inline: auto; padding-inline: clamp(1rem, 4vw, 2.5rem); }
+
+/* Header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 1.25rem; }
+.name { font: 600 1rem var(--mono); text-decoration: none; letter-spacing: -0.01em; }
+.name span { color: var(--accent); }
+.top nav { display: flex; gap: 1.5rem; font-size: 0.9375rem; }
+.top nav a { text-decoration: none; color: var(--muted); }
+.top nav a:hover { color: var(--text); }
+@media (max-width: 34rem) { .top nav a.opt { display: none; } }
+
+/* Hero */
+.hero { display: grid; gap: clamp(2rem, 5vw, 4rem); align-items: center; padding-block: clamp(2.5rem, 8vw, 6rem) clamp(3rem, 8vw, 6rem); }
+@media (min-width: 56rem) { .hero { grid-template-columns: 1.05fr 1fr; } }
+.hero > * { min-width: 0; }
+h1 { font-size: clamp(2.25rem, 6vw, 3.75rem); line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; text-wrap: balance; }
+.lede { margin-top: 1.5rem; font-size: clamp(1.0625rem, 2vw, 1.25rem); color: var(--muted); max-width: 34rem; text-wrap: pretty; }
+.lede strong { color: var(--text); font-weight: 600; }
+.cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+.btn { display: inline-block; padding: 0.7rem 1.15rem; border-radius: 8px; border: 1px solid var(--line); font-weight: 600; font-size: 0.9375rem; text-decoration: none; }
+.btn:hover { border-color: var(--text); color: var(--text); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.caption { margin-top: 0.75rem; font-size: 0.875rem; color: var(--muted); }
+
+/* Code */
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  overflow-x: auto;
+  tab-size: 4;
+  color-scheme: dark;
+}
+.hero pre { font-size: clamp(0.875rem, 1.6vw, 1.0625rem); padding: 1.5rem 1.6rem; }
+pre .k { color: var(--code-key); }
+pre .s { color: var(--code-str); }
+pre .c { color: var(--code-dim); }
+.file { font: 0.8125rem var(--mono); color: var(--muted); margin-bottom: 0.5rem; }
+
+/* Sections */
+section { border-top: 1px solid var(--line); padding-block: clamp(2.5rem, 6vw, 4.5rem); display: grid; gap: 1.5rem 3rem; }
+@media (min-width: 56rem) { section { grid-template-columns: 15rem 1fr; } }
+section > * { min-width: 0; }
+h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; text-wrap: balance; }
+.sub { margin-top: 0.6rem; color: var(--muted); font-size: 0.9375rem; }
+.body > * + * { margin-top: 1.25rem; }
+.body p { max-width: 42rem; text-wrap: pretty; }
+
+/* Flow diagram */
+.flow { display: grid; gap: 0.75rem; align-items: stretch; }
+@media (min-width: 44rem) { .flow { grid-template-columns: 1fr auto 1.2fr auto 1.2fr; } }
+.node { border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; background: var(--surface); }
+.node h3 { font-size: 0.9375rem; }
+.node .tag { font: 0.75rem var(--mono); color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+.node ul { margin-top: 0.5rem; font: 0.8125rem/1.7 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.arrow { display: grid; place-items: center; font: 0.75rem var(--mono); color: var(--muted); text-align: center; }
+.arrow::after { content: "↓"; font-size: 1.25rem; color: var(--text); }
+@media (min-width: 44rem) { .arrow::after { content: "→"; } }
+.engine { border: 1px dashed var(--line); border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.9375rem; color: var(--muted); }
+.engine code { white-space: normal; overflow-wrap: anywhere; }
+
+/* Columns of facts */
+.cols { display: grid; gap: 1.5rem 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.cols h3 { font-size: 0.8125rem; font-family: var(--mono); font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
+.cols ul { margin-top: 0.6rem; font: 0.8125rem/1.9 var(--mono); overflow-wrap: anywhere; }
+.cols p { margin-top: 0.6rem; font-size: 0.875rem; color: var(--muted); }
+
+/* Definition rows */
+.rows > div { display: grid; gap: 0.25rem 1.5rem; padding-block: 0.9rem; border-top: 1px solid var(--line); }
+.rows > div:first-child { border-top: 0; padding-top: 0; }
+@media (min-width: 40rem) { .rows > div { grid-template-columns: 13rem 1fr; } }
+.rows dt { font-weight: 600; }
+.rows dd { color: var(--muted); }
+.rows dd code { white-space: normal; }
+
+/* Steps */
+.steps { counter-reset: step; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 2.25rem 1fr; padding-block: 0.8rem; border-top: 1px solid var(--line); }
+.steps li:first-child { border-top: 0; padding-top: 0; }
+.steps li::before { content: counter(step); font: 600 0.875rem/1.9 var(--mono); color: var(--accent); }
+.steps li > div { min-width: 0; }
+.steps strong { font-weight: 600; }
+.steps span { color: var(--muted); }
+
+footer { border-top: 1px solid var(--line); padding-block: 2rem 3rem; font-size: 0.875rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; justify-content: space-between; }
+footer p { max-width: 40rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <a class="name" href="./" aria-label="caddy-edge home"><span>▸</span> caddy-edge</a>
+  <nav aria-label="Primary">
+    <a class="opt" href="#every-site">Hardening</a>
+    <a class="opt" href="#deploy">Deploys</a>
+    <a href="#start">Get started</a>
+    <a href="https://github.com/pungoyal/caddy-edge">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<div class="hero">
+  <div>
+    <h1>A hardened HTTPS edge for one Docker host.</h1>
+    <p class="lede">Caddy, kept in git and deployed by GitHub Actions. <strong>Each application is a four-line file, and adding one is a form.</strong> A config Caddy rejects never replaces the one that is serving.</p>
+    <div class="cta">
+      <a class="btn primary" href="#start">Get started</a>
+      <a class="btn" href="https://github.com/pungoyal/caddy-edge">View on GitHub</a>
+    </div>
+  </div>
+  <figure>
+    <p class="file">sites/app.caddy</p>
+<pre><code>app.example.com {
+	<span class="k">import</span> hardened 10MB <span class="s">'self'</span>
+	<span class="k">import</span> app app:3000
+}</code></pre>
+    <figcaption class="caption">The whole configuration for one application: a certificate, security headers, a body cap, compression, a credential-free access log, and a proxy that waits out a restart.</figcaption>
+  </figure>
+</div>
+
+<section id="how">
+  <div>
+    <h2>Two repositories</h2>
+    <p class="sub">What you serve stays private. The engine stays shared.</p>
+  </div>
+  <div class="body">
+    <div class="flow">
+      <div class="node">
+        <p class="tag">You</p>
+        <h3>A form, or a pull request</h3>
+        <ul>
+          <li>name: app</li>
+          <li>hostname: app.example.com</li>
+          <li>upstream: app:3000</li>
+        </ul>
+      </div>
+      <div class="arrow">commit</div>
+      <div class="node">
+        <p class="tag">Private</p>
+        <h3>Your instance repository</h3>
+        <ul>
+          <li>sites/*.caddy</li>
+          <li>workflows: site, deploy</li>
+          <li>variables, deploy key</li>
+        </ul>
+      </div>
+      <div class="arrow">SSH</div>
+      <div class="node">
+        <p class="tag">Yours</p>
+        <h3>Your Docker host</h3>
+        <ul>
+          <li>Caddy :80 :443</li>
+          <li>shared Docker network</li>
+          <li>app:3000, other:8080</li>
+        </ul>
+      </div>
+    </div>
+    <p class="engine">The instance's workflows call <code>pungoyal/caddy-edge/actions/…@&lt;commit&gt;</code>. This repository holds the Caddyfile, the Compose file and the deploy logic, and no hostnames, addresses or secrets. Renovate moves the pin when there is a release.</p>
+  </div>
+</section>
+
+<section id="every-site">
+  <div>
+    <h2>What every site gets</h2>
+    <p class="sub">One policy, imported by name. Read it in the <a href="https://github.com/pungoyal/caddy-edge/blob/main/deploy/caddy/Caddyfile">Caddyfile</a>, where every line says why.</p>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div>
+        <h3>Sent to the browser</h3>
+        <ul>
+          <li>Strict-Transport-Security</li>
+          <li>X-Content-Type-Options</li>
+          <li>Content-Security-Policy *</li>
+          <li>Referrer-Policy *</li>
+          <li>Permissions-Policy *</li>
+          <li>Cross-Origin-Opener-Policy *</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Removed from responses</h3>
+        <ul>
+          <li>Server</li>
+          <li>X-Powered-By</li>
+          <li>Via</li>
+          <li>X-XSS-Protection</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Stripped from requests</h3>
+        <ul>
+          <li>X-Real-IP, X-Client-IP</li>
+          <li>CF-Connecting-IP, True-Client-IP</li>
+          <li>Forwarded, X-Forwarded-Port, -Prefix, -Server</li>
+          <li>X-Original-URL, X-Rewrite-URL</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Kept out of logs</h3>
+        <ul>
+          <li>Authorization, Proxy-Authorization</li>
+          <li>Cookie, Set-Cookie</li>
+          <li>Grafana token headers</li>
+          <li>?token, ?access_token, ?api_key, …</li>
+        </ul>
+      </div>
+    </div>
+    <p>* The document policy has exactly one owner per site. <code>import hardened</code> and the edge writes it: <code>frame-ancestors</code>, <code>object-src 'none'</code>, <code>base-uri 'self'</code>. <code>import hardened-app-policy</code> and the application's own passes through untouched. Never both, so an origin never sends two policies that disagree.</p>
+    <dl class="rows">
+      <div><dt>Certificates</dt><dd>Obtained and renewed by Caddy for every site file. Nothing to configure.</dd></div>
+      <div><dt>Unknown hostnames</dt><dd>A request for a name with no site file is aborted, not answered.</dd></div>
+      <div><dt>Slow clients</dt><dd>Header, body and idle timeouts, and a request-body cap you set per site.</dd></div>
+      <div><dt>Application restarts</dt><dd>The proxy retries failed connects for 30 seconds, so a request that arrives while a container is being replaced waits instead of getting a 502.</dd></div>
+      <div><dt>The container</dt><dd>Read-only filesystem, every capability dropped except binding ports, <code>no-new-privileges</code>, memory and CPU limits, admin API on loopback only. No Docker socket.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section id="deploy">
+  <div>
+    <h2>A deploy that cannot leave you down</h2>
+    <p class="sub">CI runs this sequence for real on every change, over SSH against its own runner, <a href="https://github.com/pungoyal/caddy-edge/blob/main/.github/workflows/ci.yml">failure path included</a>.</p>
+  </div>
+  <div class="body">
+    <ol class="steps">
+      <li><div><strong>Validate.</strong> <span>The site files are checked against the Caddyfile, then Caddy is started once with internal certificates. No secrets, so it runs on every pull request.</span></div></li>
+      <li><div><strong>Ship three things.</strong> <span><code>compose.yaml</code>, <code>.env</code> and <code>caddy/</code> go to the host over SSH. What was serving is copied to <code>previous/</code> first.</span></div></li>
+      <li><div><strong>Reload, not restart.</strong> <span><code>caddy reload</code> applies the config with no dropped connection. The container is recreated only when the Compose file itself changed.</span></div></li>
+      <li><div><strong>Or put it back.</strong> <span>A config Caddy rejects leaves the old one serving. If the deploy does not come up healthy, <code>previous/</code> is restored and the job fails, with Caddy's log minus the access log.</span></div></li>
+    </ol>
+    <p>The host needs Docker and nothing else. No agent, no script, no tool to install: <code>docker compose ps</code>, <code>logs</code> and <code>restart</code> work by hand in the deploy directory.</p>
+  </div>
+</section>
+
+<section id="form">
+  <div>
+    <h2>Adding a site is a form</h2>
+    <p class="sub">Whoever can run workflows in your instance repository is an admin. That is the whole access model.</p>
+  </div>
+  <div class="body">
+    <p>Run it from the Actions tab, the GitHub mobile app or the command line. Every input is matched against a pattern before it becomes config. The run validates, commits to <code>main</code>, optionally creates the DNS record on Cloudflare, and deploys that commit.</p>
+<pre><code>gh workflow run site.yml \
+  <span class="k">-f</span> action=set <span class="k">-f</span> name=app \
+  <span class="k">-f</span> hostname=app.example.com <span class="k">-f</span> upstream=app:3000 <span class="k">-f</span> dns=true
+
+gh workflow run site.yml <span class="k">-f</span> action=remove <span class="k">-f</span> name=app <span class="k">-f</span> dns=true</code></pre>
+    <p>Anything the form cannot express is a pull request against the site file: the same validation runs, and merging deploys.</p>
+  </div>
+</section>
+
+<section id="start">
+  <div>
+    <h2>Get started</h2>
+    <p class="sub">You need a host with a public IPv4 address and a domain whose DNS you control.</p>
+  </div>
+  <div class="body">
+    <ol class="steps">
+      <li><div><strong>Prepare the host.</strong> <span>Docker Engine 25 or later with the Compose plugin, a deploy user in the <code>docker</code> group, a directory, a Docker network, and ports 80 and 443 open.</span></div></li>
+      <li><div><strong>Create a private repository</strong> <span>from the contents of <a href="https://github.com/pungoyal/caddy-edge/tree/main/examples/instance"><code>examples/instance</code></a>.</span></div></li>
+      <li><div><strong>Give it six variables and a deploy key.</strong> <span>The host's address, SSH user and host key, the deploy directory, the network name and an ACME contact address.</span></div></li>
+      <li><div><strong>Run the <code>site</code> workflow</strong> <span>to serve your first application.</span></div></li>
+    </ol>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/pungoyal/caddy-edge/tree/main/examples/instance#readme">Read the step-by-step guide</a>
+    </div>
+    <p>Or call the actions from workflows of your own:</p>
+<pre><code><span class="k">- uses:</span> pungoyal/caddy-edge/actions/deploy@&lt;commit&gt; <span class="c"># v0.1.0</span>
+  <span class="k">with:</span>
+    <span class="k">sites:</span> sites
+    <span class="k">ssh-host:</span> ${{ vars.SSH_HOST }}
+    <span class="k">ssh-user:</span> ${{ vars.SSH_USER }}
+    <span class="k">ssh-known-hosts:</span> ${{ vars.SSH_KNOWN_HOSTS }}
+    <span class="k">ssh-private-key:</span> ${{ secrets.SSH_PRIVATE_KEY }}
+    <span class="k">deploy-path:</span> ${{ vars.DEPLOY_PATH }}
+    <span class="k">docker-network:</span> ${{ vars.DOCKER_NETWORK }}
+    <span class="k">acme-email:</span> ${{ vars.ACME_EMAIL }}</code></pre>
+    <dl class="rows">
+      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/validate/action.yml"><code>actions/validate</code></a></dt><dd>Checks site files and starts Caddy once with internal certificates.</dd></div>
+      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/deploy/action.yml"><code>actions/deploy</code></a></dt><dd>Ships, reloads, and restores the previous config on failure.</dd></div>
+      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/site/action.yml"><code>actions/site</code></a></dt><dd>Writes or removes one site file from validated inputs.</dd></div>
+      <div><dt><a href="https://github.com/pungoyal/caddy-edge/blob/main/actions/dns/action.yml"><code>actions/dns</code></a></dt><dd>Sets or deletes a DNS-only Cloudflare <code>A</code> record. Optional.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section id="not">
+  <div>
+    <h2>What it is not</h2>
+    <p class="sub">Know before you adopt it.</p>
+  </div>
+  <div class="body">
+    <dl class="rows">
+      <div><dt>Not a platform</dt><dd>It does not build or deploy your applications. They are their own Compose projects that join the shared network.</dd></div>
+      <div><dt>Not a firewall</dt><dd>No rate limiting, no WAF, no bot rules.</dd></div>
+      <div><dt>Not behind a CDN</dt><dd>Certificates come from HTTP and TLS-ALPN challenges, so the host answers directly and its address is public.</dd></div>
+      <div><dt>Not multi-host</dt><dd>One Caddy on one host.</dd></div>
+      <div><dt>Not low-privilege on the host</dt><dd>The deploy user is in the <code>docker</code> group, which is root. Whoever can run your instance's workflows controls the host. The <a href="https://github.com/pungoyal/caddy-edge/blob/main/SECURITY.md">security policy</a> has the full trust model.</dd></div>
+    </dl>
+    <p>If you would rather have applications declare their own routes with container labels, and no repository in between, use <a href="https://github.com/lucaslorentz/caddy-docker-proxy">caddy-docker-proxy</a> or <a href="https://traefik.io/traefik/">Traefik</a>. The price is giving the proxy the Docker socket.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p><a href="https://github.com/pungoyal/caddy-edge/blob/main/LICENSE">MIT licence</a>. Caddy is a registered trademark of Stack Holdings GmbH; this project is not affiliated with or endorsed by the Caddy project.</p>
+  <p><a href="https://github.com/pungoyal/caddy-edge/releases">Releases</a> · <a href="https://github.com/pungoyal/caddy-edge/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/pungoyal/caddy-edge/issues">Issues</a></p>
+</footer>
+
+</div>
+</body>
+</html>

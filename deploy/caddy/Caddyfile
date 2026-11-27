@@ -1,8 +1,8 @@
-# Strips credentials from logs. Caddy masks only Authorization, Proxy-Authorization,
-# Cookie and Set-Cookie, and logs app-specific token headers verbatim. Imported by
-# both loggers because reverse_proxy warnings and http.log.error entries go through
-# the default logger with full request headers. Header keys use Go's canonical form.
-# request_token is Kite Connect's login redirect parameter.
+# Keeps credentials out of the logs. Caddy masks only Authorization, Proxy-Authorization,
+# Cookie and Set-Cookie; every other header and the whole query string are logged as
+# received. Imported by both loggers: reverse_proxy warnings and http.log.error entries
+# go through the default logger with full request headers. Header keys use Go's
+# canonical form. A credential your apps carry anywhere else is one more line here.
 (redact-credentials) {
 	format filter {
 		wrap json
@@ -57,8 +57,8 @@
 #   import hardened-app-policy <max_request_body>          app owns it
 #
 # Static, never inferred from the response: a `?Header` default fires only on
-# routes where the app stayed silent (Grafana sets X-Frame-Options from its API
-# handlers but not its static handler), giving one origin two policies.
+# routes where the app stayed silent (Grafana, for one, sets X-Frame-Options from
+# its API handlers but not its static handler), giving one origin two policies.
 
 # For apps that ship their own policy, and the base of `hardened`. Fields are
 # omitted, not deleted: a `-Content-Security-Policy` op runs after the proxy and
@@ -88,7 +88,7 @@
 		-X-Powered-By
 		-Via
 
-		# Removed from all browsers; OWASP says delete it. Grafana still sends it.
+		# Removed from all browsers; OWASP says delete it. Some apps still send it.
 		-X-XSS-Protection
 
 		# Run after the proxy so these replace the app's values instead of appending.
@@ -115,11 +115,11 @@
 
 	header {
 		# Not a content policy: the edge cannot know an app's script origins.
-		# `base-uri 'self'` because Grafana serves <base href="/">.
+		# `base-uri 'self'`, not 'none': apps such as Grafana serve <base href="/">.
 		Content-Security-Policy "frame-ancestors {args[1]}; object-src 'none'; base-uri 'self'"
 		Referrer-Policy "strict-origin-when-cross-origin"
 
-		# `fullscreen` is absent: Grafana panels use it.
+		# `fullscreen` is absent: dashboards and video players use it.
 		Permissions-Policy "accelerometer=(), autoplay=(), browsing-topics=(), camera=(), display-capture=(), encrypted-media=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), serial=(), usb=()"
 
 		# `-allow-popups` keeps OAuth popups working.

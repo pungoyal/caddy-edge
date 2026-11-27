@@ -35,8 +35,8 @@ case $action in
 
     comments=
     if [[ -f $file ]]; then
-      # A file with more than the two imports was edited by hand (logs-mcp strips a
-      # header); rewriting it from four inputs would silently drop that.
+      # A file with more than the two imports was edited by hand, to strip a header,
+      # say. Rewriting it from the form's inputs would silently drop that.
       mapfile -t body < <(grep -vE '^[[:space:]]*(#|$)' "$file")
       [[ ${#body[@]} -eq 4 && ${body[1]} =~ ^[[:space:]]*import\ hardened && ${body[2]} =~ ^[[:space:]]*import\ app\  ]] ||
         die "$name.caddy has more than the two imports; change it in a pull request"

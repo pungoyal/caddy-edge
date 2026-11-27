@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the directory that is shipped to the VM: this repository's deploy/ at the
+# Builds the directory that is shipped to the host: this repository's deploy/ at the
 # ref the action was pinned to, with the caller's site files in caddy/sites.
 #
 #   assemble.sh <sites-dir|""> <out-dir>

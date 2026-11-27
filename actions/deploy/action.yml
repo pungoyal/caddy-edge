@@ -78,7 +78,7 @@ runs:
         printf '%s\n' "$SSH_PRIVATE_KEY" > "$dir/key"
         printf '%s\n' "$SSH_KNOWN_HOSTS" > "$dir/known_hosts"
         {
-          echo "Host vm"
+          echo "Host edge"
           echo "  HostName $SSH_HOST"
           echo "  User $SSH_USER"
           echo "  Port $SSH_PORT"
@@ -100,25 +100,25 @@ runs:
         set -o pipefail
         # ssh hands the remote shell one string, so the path is constrained, not quoted.
         [[ $DEPLOY_PATH =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "::error::invalid deploy-path" >&2; exit 1; }
-        vm() { ssh -F "$RUNNER_TEMP/edge-ssh/config" vm "cd $DEPLOY_PATH && $1"; }
+        on_host() { ssh -F "$RUNNER_TEMP/edge-ssh/config" edge "cd $DEPLOY_PATH && $1"; }
         put() { echo "mkdir -p caddy && find caddy -mindepth 1 -delete && cp -a $1/compose.yaml $1/.env $1/caddy ."; }
         up='docker compose up -d --quiet-pull --remove-orphans --wait --wait-timeout 60 && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile'
 
-        vm 'rm -rf previous next && mkdir previous next'
+        on_host 'rm -rf previous next && mkdir previous next'
         # Nothing serves yet on the first deploy. Tested there: here a failed connection
         # would read as a missing file.
-        vm 'test ! -f compose.yaml || cp -a compose.yaml .env caddy previous/'
+        on_host 'test ! -f compose.yaml || cp -a compose.yaml .env caddy previous/'
         # -p: Caddy runs without DAC_OVERRIDE, and the login umask may hide the files from it.
-        tar -C "$RUNNER_TEMP/edge" -cf - compose.yaml .env caddy | vm 'tar -xpf - -C next'
-        vm "$(put next) && $up" || {
+        tar -C "$RUNNER_TEMP/edge" -cf - compose.yaml .env caddy | on_host 'tar -xpf - -C next'
+        on_host "$(put next) && $up" || {
           # Without the access log: it holds visitors' addresses and URLs, and this job's
           # log may be public.
-          vm 'docker compose logs --no-log-prefix --tail=500 2>&1 | grep -v "\"logger\":\"http.log.access" | tail -n 50' || true
-          vm 'test ! -f previous/compose.yaml' || vm "$(put previous) && $up" || true
+          on_host 'docker compose logs --no-log-prefix --tail=500 2>&1 | grep -v "\"logger\":\"http.log.access" | tail -n 50' || true
+          on_host 'test ! -f previous/compose.yaml' || on_host "$(put previous) && $up" || true
           exit 1
         }
         # Only Caddy's: the server is shared, and other projects keep images to roll back to.
-        vm 'rm -rf next; docker image prune -af --filter label=org.opencontainers.image.title=Caddy' || true
+        on_host 'rm -rf next; docker image prune -af --filter label=org.opencontainers.image.title=Caddy' || true
 
     - name: Remove the deploy key
       if: always()

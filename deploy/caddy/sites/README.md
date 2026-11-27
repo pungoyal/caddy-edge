@@ -1,13 +1,15 @@
+# Site files
+
 Site files do not live here. An instance repository keeps one `*.caddy` file per application in its own `sites/` directory, and the `deploy` action copies them into this directory on the way to the host.
 
-```
+```caddy
 app.example.com {
-    import hardened 10MB 'self'
-    import app app:8080
+	import hardened 10MB 'self'
+	import app app:3000
 }
 ```
 
-`app:8080` is the container name on the shared Docker network and its internal port. Apps publish no host ports. `import app` is `reverse_proxy` that retries failed connects for 30s, so a request that arrives while the app's container is being replaced waits instead of getting a 502.
+`app:3000` is the container name on the shared Docker network and its internal port. Apps publish no host ports. `import app` is `reverse_proxy` that retries failed connects for 30s, so a request that arrives while the app's container is being replaced waits instead of getting a 502.
 
 The `site` action writes this file from a form. Anything beyond the two imports is added by hand in a pull request, and the action then leaves the file alone.
 
